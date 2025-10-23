@@ -1,5 +1,6 @@
 # Maryland Economics Data Dashboard
 **Written by Donasyl Aho, Zainab Ahmadi, Max Eliker, Lily Gates, Joshua Kwan, and Ansh Rekhi**
+_University of Maryland, College Park_ 
 
 ## Description
 In collaboration with the National Center for Smart Growth Research and Education (NCSG) at the University of Maryland, College Park...
