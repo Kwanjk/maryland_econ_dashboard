@@ -8,9 +8,7 @@ _University of Maryland, College Park_
 ## Description
 In collaboration with the National Center for Smart Growth Research and Education (NCSG) at the University of Maryland, College Park, this project provides a dashboard and CSV outputs of economic indicators for Maryland counties and the state.  
 
-Data are sourced from the [FRED API](https://fred.stlouisfed.org/) and include metrics such as population, housing, employment, GDP, and more.
-
-This project fetches economic data for Maryland counties and the state of Maryland using the Federal Reserve Economic Data (FRED) API.  
+This project fetches economic data for Maryland counties and the state of Maryland using the Federal Reserve Economic Data (FRED) API.  The [FRED API](https://fred.stlouisfed.org/) includes metrics such as population, housing, employment, GDP, and more.
 
 The output is a set of CSV files containing historical observations for various economic indicators, including population, housing, labor market, and GDP metrics.
 
@@ -58,6 +56,7 @@ fred_api: your_api_key_here
 ---
 
 ## Output Structure
+```
 csv_outputs/
 ├── county_data/
 │   ├── montgomery/
@@ -70,8 +69,8 @@ csv_outputs/
     ├── resident_population.csv
     ├── median_household_income.csv
     └── ...
+```
 
----
 
 Each CSV contains:
 * `date` – observation date
@@ -90,7 +89,6 @@ This project requires the following Python libraries:
 * `urllib.error` (standard library) – for handling HTTP errors
 
 
-
 ---
 
 ## Error Handling & Rate Limits
@@ -99,20 +97,7 @@ This project requires the following Python libraries:
 ```
 [WARN] Could not fetch series {series_id}. Skipping.
 ```
-
 ---
-=======
-
-* **fredapi** — to access Federal Reserve Economic Data (FRED) API  
-* **pandas** — for data manipulation and merging of time series  
-* **matplotlib** — for creating visualizations of housing indicators  
-* **datetime** — for handling time stamps and automation dates (built-in, no install needed)
-
-You can install all required dependencies with:
-```bash
-pip install fredapi pandas matplotlib
-
->>>>>>> 5da2d286355027dbdd46c9fb5f2e27204220422d
 
 ## Future Seteps
 * Add caching to prevent repeated API calls for unchanged series.
