@@ -79,6 +79,7 @@ Each CSV contains:
 
 ## Required Dependencies
 This project requires the following Python libraries:
+<<<<<<< HEAD
 * `pandas` – for data manipulation
 * `fredapi` – for accessing the FRED API
 * `pyyaml` – for loading API keys securely
@@ -100,6 +101,18 @@ This project requires the following Python libraries:
 ```
 
 ---
+=======
+
+* **fredapi** — to access Federal Reserve Economic Data (FRED) API  
+* **pandas** — for data manipulation and merging of time series  
+* **matplotlib** — for creating visualizations of housing indicators  
+* **datetime** — for handling time stamps and automation dates (built-in, no install needed)
+
+You can install all required dependencies with:
+```bash
+pip install fredapi pandas matplotlib
+
+>>>>>>> 5da2d286355027dbdd46c9fb5f2e27204220422d
 
 ## Future Seteps
 * Add caching to prevent repeated API calls for unchanged series.
