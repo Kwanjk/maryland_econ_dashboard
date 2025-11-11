@@ -7,7 +7,7 @@ using `fredapi`. Generates:
 1. One CSV per county (for Tableau linkage)
 2. A master combined dataset
 3. A data dictionary summarizing all series IDs
-4. A Graphviz pipeline diagram for documentation
+4. A text-based pipeline summary (no Graphviz dependency)
 
 Author: Joshua Kwan
 Date: 11/11/2025
@@ -19,13 +19,12 @@ import pandas as pd
 from fredapi import Fred
 from functools import reduce
 from tqdm import tqdm
-from graphviz import Digraph
 
 # ======================================================
 # CONFIGURATION
 # ======================================================
 
-API_KEY = "2ccf5b794d310f8cde1d30c463f8d2d4"  # Replace with your key
+API_KEY = "2ccf5b794d310f8cde1d30c463f8d2d4"  # Replace with your own key
 fred = Fred(api_key=API_KEY)
 SLEEP_TIME = 0.25
 
@@ -35,21 +34,23 @@ os.makedirs(COUNTY_EXPORT_PATH, exist_ok=True)
 os.makedirs(MASTER_EXPORT_PATH, exist_ok=True)
 
 DATA_DICT_PATH = os.path.join("data", "data_dictionary.csv")
-DIAGRAM_PATH = os.path.join("data", "pipeline_diagram.png")
+SUMMARY_PATH = os.path.join("data", "pipeline_summary.txt")
 
 # ======================================================
-# FRED COUNTY SERIES
+# COUNTY SERIES DEFINITIONS
 # ======================================================
-# (Keep your existing COUNTIES dict exactly as you have it)
-from masterdatasetmulticounty_counties import COUNTIES  # Optional if you separate it
-# Otherwise, paste your full COUNTIES dictionary here directly
+# Keep your existing COUNTIES dictionary below exactly as defined.
+# (Omitted here for brevity — use your verified mapping.)
+
+from masterdatasetmulticounty_counties import COUNTIES  # Optional import if separated
+# Or paste your full COUNTIES = { ... } dictionary here directly.
 
 # ======================================================
 # HELPER FUNCTIONS
 # ======================================================
 
 def period_to_month_end(series: pd.Series, freq: str) -> pd.DataFrame:
-    """Converts a FRED series to a monthly/annual dataframe with month-end timestamps."""
+    """Convert a FRED series to a monthly/annual dataframe with month-end timestamps."""
     df = pd.DataFrame({"Date": pd.to_datetime(series.index, errors="coerce"), "Value": series.values})
     df = df.dropna(subset=["Date"])
 
@@ -110,23 +111,40 @@ def generate_data_dictionary():
     print(f"🗂️ Data dictionary saved to {DATA_DICT_PATH}")
 
 
-def generate_pipeline_diagram():
-    """Create a simple Graphviz diagram showing pipeline flow."""
-    dot = Digraph(comment="Maryland FRED Data Pipeline", format="png")
-    dot.attr(rankdir="LR", size="8,5")
+def generate_pipeline_summary():
+    """Write a simple text-based summary of the ETL pipeline."""
+    summary = """
+Maryland FRED Data Pipeline Summary
+===================================
 
-    dot.node("FRED", "FRED API", shape="cylinder", style="filled", color="lightblue")
-    dot.node("ETL", "Python ETL (Multi-County Script)", shape="box", style="filled", color="lightyellow")
-    dot.node("CSV", "County CSVs", shape="folder", style="filled", color="lightgreen")
-    dot.node("MASTER", "Master Dataset", shape="note", style="filled", color="palegreen")
-    dot.node("TABLEAU", "Tableau Dashboard", shape="component", style="filled", color="lightpink")
+Data Source:
+    → FRED API (24 Maryland counties, various BLS & Census indicators)
 
-    dot.edges(["FREDETL", "ETLCSV", "ETLMASTER", "MASTERTABLEAU"])
-    dot.render(DIAGRAM_PATH.replace(".png", ""), cleanup=True)
-    print(f"📈 Pipeline diagram generated at {DIAGRAM_PATH}")
+ETL Steps:
+    1. Pull raw FRED time-series data for each indicator.
+    2. Convert annual/monthly data to month-end timestamps.
+    3. Merge county-level metrics into unified DataFrames.
+    4. Save per-county CSVs under /data/counties.
+    5. Combine all counties into master dataset under /data/master.
+    6. Generate data_dictionary.csv documenting series and frequencies.
+
+Output Files:
+    - data/counties/<County>.csv
+    - data/master/maryland_master.csv
+    - data/data_dictionary.csv
+    - data/pipeline_summary.txt
+
+Integration:
+    - Tableau connects directly to /data/master/maryland_master.csv
+    - Optional: Automate monthly GitHub Action refresh
+"""
+    with open(SUMMARY_PATH, "w") as f:
+        f.write(summary)
+    print(f"📝 Pipeline summary written to {SUMMARY_PATH}")
+
 
 # ======================================================
-# MAIN FUNCTION
+# MAIN EXECUTION
 # ======================================================
 
 def main():
@@ -159,10 +177,14 @@ def main():
 
     # Documentation utilities
     generate_data_dictionary()
-    generate_pipeline_diagram()
+    generate_pipeline_summary()
 
     print(f"\n⏱️ Runtime: {time.time() - start_time:.2f} seconds")
 
+
+# ======================================================
+# ENTRY POINT
+# ======================================================
 
 if __name__ == "__main__":
     main()
