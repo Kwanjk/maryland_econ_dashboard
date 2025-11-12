@@ -19,14 +19,13 @@ import pandas as pd
 from fredapi import Fred
 from functools import reduce
 from tqdm import tqdm
-from dotenv import load_dotenv
 
 # ======================================================
 # CONFIGURATION
 # ======================================================
 
 # Load .env if available (useful for local testing)
-load_dotenv()
+#load_dotenv()
 
 # Get FRED API key from environment variable (preferred)
 API_KEY = os.getenv("FRED_API_KEY")
