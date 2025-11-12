@@ -2,3 +2,31 @@
 
 # Ignore FRED API key
 api_keys.yaml
+
+# added by Josh 
+# --- Environment & Secrets ---
+.env
+api_keys.yaml
+
+# --- Data Outputs ---
+data/*
+!data/.gitkeep  # optional placeholder file if you want to keep the folder structure
+
+csv_outputs/
+__pycache__/
+*.log
+
+# --- Jupyter Notebooks & Checkpoints ---
+.ipynb_checkpoints/
+*.ipynb
+
+# --- OS & IDE Files ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Python Virtual Environments ---
+.venv/
+venv/
+.envrc

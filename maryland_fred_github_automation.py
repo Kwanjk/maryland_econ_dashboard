@@ -19,12 +19,21 @@ import pandas as pd
 from fredapi import Fred
 from functools import reduce
 from tqdm import tqdm
+from dotenv import load_dotenv
 
 # ======================================================
 # CONFIGURATION
 # ======================================================
 
-API_KEY = "2ccf5b794d310f8cde1d30c463f8d2d4"  # Replace with your own key
+# Load .env if available (useful for local testing)
+load_dotenv()
+
+# Get FRED API key from environment variable (preferred)
+API_KEY = os.getenv("FRED_API_KEY")
+
+if not API_KEY:
+    raise ValueError("❌ Missing FRED_API_KEY. Please set it as an environment variable or in GitHub Secrets.")
+
 fred = Fred(api_key=API_KEY)
 SLEEP_TIME = 0.25
 
@@ -39,11 +48,395 @@ SUMMARY_PATH = os.path.join("data", "pipeline_summary.txt")
 # ======================================================
 # COUNTY SERIES DEFINITIONS
 # ======================================================
-# Keep your existing COUNTIES dictionary below exactly as defined.
-# (Omitted here for brevity — use your verified mapping.)
+# ⚠️ Paste your full verified COUNTIES = {...} dictionary here exactly as before.
 
-from masterdatasetmulticounty_counties import COUNTIES  # Optional import if separated
-# Or paste your full COUNTIES = { ... } dictionary here directly.
+COUNTIES = {
+    # Code -> name + series IDs
+    # Employment Count is LAUS "Employment Level": LAUCN + state(24) + county(FIPS3) + area(0000000) + 05
+    # Example: Allegany (FIPS 001) -> LAUCN240010000000005
+    "AG": {
+        "County": "Allegany",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24001A", "A"),
+            "Civilian_Labor_Force": ("MDALLE0LFN", "M"),
+            "Employment_Count": ("LAUCN240010000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24001A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24001", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24001", "M"),
+            "Permits_Annual": ("BPPRIV024001", "A"),
+            "Real_GDP": ("REALGDPALL24001", "A"),
+            "Population_Annual": ("MDALLE0POP", "A"),
+            "Unemployed_Persons": ("LAUCN240010000000004", "M"),
+            "Unemployment_Rate": ("MDALLE0URN", "M"),
+        },
+    },
+    "AA": {
+        "County": "Anne Arundel",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24003A", "A"),
+            "Civilian_Labor_Force": ("MDANNE5LFN", "M"),
+            "Employment_Count": ("LAUCN240030000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24003A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24003", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24003", "M"),
+            "Permits_Annual": ("BPPRIV024003", "A"),
+            "Real_GDP": ("REALGDPALL24003", "A"),
+            "Population_Annual": ("MDANNE5POP", "A"),
+            "Unemployed_Persons": ("LAUCN240030000000004", "M"),
+            "Unemployment_Rate": ("MDANNE5URN", "M"),
+        },
+    },
+    "BALT": {
+        "County": "Baltimore County",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24005A", "A"),
+            "Civilian_Labor_Force": ("MDBALT0LFN", "M"),
+            "Employment_Count": ("LAUCN240050000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24005A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24005", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24005", "M"),
+            "Permits_Annual": ("BPPRIV024005", "A"),
+            "Real_GDP": ("REALGDPALL24005", "A"),
+            "Population_Annual": ("MDBALT0POP", "A"),
+            "Unemployed_Persons": ("LAUCN240050000000004", "M"),
+            "Unemployment_Rate": ("MDBALT0URN", "M"),
+        },
+    },
+    "BALT_CITY": {
+        "County": "Baltimore City",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24510A", "A"),
+            "Civilian_Labor_Force": ("MDBALT5LFN", "M"),
+            # client alt option was CES "SMS24925810000000001"
+            "Employment_Count": ("SMS24925810000000001", "M"),
+            "Poverty_All_Ages": ("PPAAMD24510A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24510", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24510", "M"),
+            "Permits_Annual": ("BPPRIV024510", "A"),
+            "Real_GDP": ("REALGDPALL24510", "A"),
+            "Population_Annual": ("MDBALT5POP", "A"),
+            "Unemployed_Persons": ("LAUCN245100000000004", "M"),
+            "Unemployment_Rate": ("MDBALT5URN", "M"),
+        },
+    },
+    "CAL": {
+        "County": "Calvert",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24009A", "A"),
+            "Civilian_Labor_Force": ("MDCALV9LFN", "M"),
+            "Employment_Count": ("LAUCN240090000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24009A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24009", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24009", "M"),
+            "Permits_Annual": ("BPPRIV024009", "A"),
+            "Real_GDP": ("REALGDPALL24009", "A"),
+            "Population_Annual": ("MDCALV9POP", "A"),
+            "Unemployed_Persons": ("LAUCN240090000000004", "M"),
+            "Unemployment_Rate": ("MDCALV9URN", "M"),
+        },
+    },
+    "CAR": {
+        "County": "Caroline",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24011A", "A"),
+            "Civilian_Labor_Force": ("MDCARO1LFN", "M"),
+            "Employment_Count": ("LAUCN240110000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24011A156NCEN", "A"),
+            # No active listings / median listing price for Caroline
+            "Permits_Annual": ("BPPRIV024011", "A"),
+            "Real_GDP": ("REALGDPALL24011", "A"),
+            "Population_Annual": ("MDCARO1POP", "A"),
+            "Unemployed_Persons": ("LAUCN240110000000004", "M"),
+            "Unemployment_Rate": ("MDCARO1URN", "M"),
+        },
+    },
+    "CARR": {
+        "County": "Carroll",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24013A", "A"),
+            "Civilian_Labor_Force": ("MDCARR5LFN", "M"),
+            "Employment_Count": ("LAUCN240130000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24013A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24013", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24013", "M"),
+            "Permits_Annual": ("BPPRIV024013", "A"),
+            "Real_GDP": ("REALGDPALL24013", "A"),
+            "Population_Annual": ("MDCARR5POP", "A"),
+            "Unemployed_Persons": ("LAUCN240130000000004", "M"),
+            "Unemployment_Rate": ("MDCARR5URN", "M"),
+        },
+    },
+    "CEC": {
+        "County": "Cecil",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24015A", "A"),
+            "Civilian_Labor_Force": ("MDCECI0LFN", "M"),
+            "Employment_Count": ("LAUCN240150000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24015A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24015", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24015", "M"),
+            "Permits_Annual": ("BPPRIV024015", "A"),
+            "Real_GDP": ("REALGDPALL24015", "A"),
+            "Population_Annual": ("MDCECI0POP", "A"),
+            "Unemployed_Persons": ("LAUCN240150000000004", "M"),
+            "Unemployment_Rate": ("MDCECI0URN", "M"),
+        },
+    },
+    "CHA": {
+        "County": "Charles",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24017A", "A"),
+            "Civilian_Labor_Force": ("MDCHAR0LFN", "M"),
+            "Employment_Count": ("LAUCN240170000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24017A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24017", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24017", "M"),
+            "Permits_Annual": ("BPPRIV024017", "A"),
+            "Real_GDP": ("REALGDPALL24017", "A"),
+            "Population_Annual": ("MDCHAR0POP", "A"),
+            "Unemployed_Persons": ("LAUCN240170000000004", "M"),
+            "Unemployment_Rate": ("MDCHAR0URN", "M"),
+        },
+    },
+    "DOR": {
+        "County": "Dorchester",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24019A", "A"),
+            "Civilian_Labor_Force": ("MDDORC9LFN", "M"),
+            "Employment_Count": ("LAUCN240190000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24019A156NCEN", "A"),
+            # No active listings / median listing price for Dorchester
+            "Permits_Annual": ("BPPRIV024019", "A"),
+            "Real_GDP": ("REALGDPALL24019", "A"),
+            "Population_Annual": ("MDDORC9POP", "A"),
+            "Unemployed_Persons": ("LAUCN240190000000004", "M"),
+            "Unemployment_Rate": ("MDDORC9URN", "M"),
+        },
+    },
+    "FRE": {
+        "County": "Frederick",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24021A", "A"),
+            "Civilian_Labor_Force": ("MDFRED5LFN", "M"),
+            "Employment_Count": ("LAUCN240210000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24021A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24021", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24021", "M"),
+            "Permits_Annual": ("BPPRIV024021", "A"),
+            "Real_GDP": ("REALGDPALL24021", "A"),
+            "Population_Annual": ("MDFRED5POP", "A"),
+            "Unemployed_Persons": ("LAUCN240210000000004", "M"),
+            "Unemployment_Rate": ("MDFRED5URN", "M"),
+        },
+    },
+    "GAR": {
+        "County": "Garrett",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24023A", "A"),
+            "Civilian_Labor_Force": ("MDGARR3LFN", "M"),
+            "Employment_Count": ("LAUCN240230000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24023A156NCEN", "A"),
+            # No active listings / median listing price for Garrett
+            "Permits_Annual": ("BPPRIV024023", "A"),
+            "Real_GDP": ("REALGDPALL24023", "A"),
+            "Population_Annual": ("MDGARR3POP", "A"),
+            "Unemployed_Persons": ("LAUCN240230000000004", "M"),
+            "Unemployment_Rate": ("MDGARR3URN", "M"),
+        },
+    },
+    "HAR": {
+        "County": "Harford",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24025A", "A"),
+            "Civilian_Labor_Force": ("MDHARF0LFN", "M"),
+            "Employment_Count": ("LAUCN240250000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24025A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24025", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24025", "M"),
+            "Permits_Annual": ("BPPRIV024025", "A"),
+            "Real_GDP": ("REALGDPALL24025", "A"),
+            "Population_Annual": ("MDHARF0POP", "A"),
+            "Unemployed_Persons": ("LAUCN240250000000004", "M"),
+            "Unemployment_Rate": ("MDHARF0URN", "M"),
+        },
+    },
+    "HOW": {
+        "County": "Howard",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24027A", "A"),
+            "Civilian_Labor_Force": ("MDHOWA0LFN", "M"),
+            "Employment_Count": ("LAUCN240270000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24027A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24027", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24027", "M"),
+            "Permits_Annual": ("BPPRIV024027", "A"),
+            "Real_GDP": ("REALGDPALL24027", "A"),
+            "Population_Annual": ("MDHOWA0POP", "A"),
+            "Unemployed_Persons": ("LAUCN240270000000004", "M"),
+            "Unemployment_Rate": ("MDHOWA0URN", "M"),
+        },
+    },
+    "KENT": {
+        "County": "Kent",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24029A", "A"),
+            "Civilian_Labor_Force": ("MDKENT9LFN", "M"),
+            "Employment_Count": ("LAUCN240290000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24029A156NCEN", "A"),
+            # No active listings / median listing price for Kent
+            "Permits_Annual": ("BPPRIV024029", "A"),
+            "Real_GDP": ("REALGDPALL24029", "A"),
+            "Population_Annual": ("MDKENT9POP", "A"),
+            "Unemployed_Persons": ("LAUCN240290000000004", "M"),
+            "Unemployment_Rate": ("MDKENT9URN", "M"),
+        },
+    },
+    "MON": {
+        "County": "Montgomery",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24031A", "A"),
+            "Civilian_Labor_Force": ("MDMONT0LFN", "M"),
+            "Employment_Count": ("LAUCN240310000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24031A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24031", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24031", "M"),
+            "Permits_Annual": ("BPPRIV024031", "A"),
+            "Real_GDP": ("REALGDPALL24031", "A"),
+            "Population_Annual": ("MDMONT0POP", "A"),
+            "Unemployed_Persons": ("LAUCN240310000000004", "M"),
+            "Unemployment_Rate": ("MDMONT0URN", "M"),
+        },
+    },
+    "PG": {
+        "County": "Prince George's",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24033A", "A"),
+            "Civilian_Labor_Force": ("MDPRIN5LFN", "M"),
+            "Employment_Count": ("LAUCN240330000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24033A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24033", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24033", "M"),
+            "Permits_Annual": ("BPPRIV024033", "A"),
+            "Real_GDP": ("REALGDPALL24033", "A"),
+            "Population_Annual": ("MDPRIN5POP", "A"),
+            "Unemployed_Persons": ("LAUCN240330000000004", "M"),
+            "Unemployment_Rate": ("MDPRIN5URN", "M"),
+        },
+    },
+    "QA": {
+        "County": "Queen Anne's",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24035A", "A"),
+            "Civilian_Labor_Force": ("MDQUEE5LFN", "M"),
+            "Employment_Count": ("LAUCN240350000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24035A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24035", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24035", "M"),
+            "Permits_Annual": ("BPPRIV024035", "A"),
+            "Real_GDP": ("REALGDPALL24035", "A"),
+            "Population_Annual": ("MDQUEE5POP", "A"),
+            "Unemployed_Persons": ("LAUCN240350000000004", "M"),
+            "Unemployment_Rate": ("MDQUEE5URN", "M"),
+        },
+    },
+    "SOM": {
+        "County": "Somerset",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24039A", "A"),
+            "Civilian_Labor_Force": ("MDSOME9LFN", "M"),
+            "Employment_Count": ("LAUCN240390000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24039A156NCEN", "A"),
+            # No active listings / median listing price for Somerset
+            "Permits_Annual": ("BPPRIV024039", "A"),
+            "Real_GDP": ("REALGDPALL24039", "A"),
+            "Population_Annual": ("MDSOME9POP", "A"),
+            "Unemployed_Persons": ("LAUCN240390000000004", "M"),
+            "Unemployment_Rate": ("MDSOME9URN", "M"),
+        },
+    },
+    "STM": {
+        "County": "St. Mary's",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24037A", "A"),
+            "Civilian_Labor_Force": ("MDSTMA5LFN", "M"),
+            "Employment_Count": ("LAUCN240370000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24037A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24037", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24037", "M"),
+            "Permits_Annual": ("BPPRIV024037", "A"),
+            "Real_GDP": ("REALGDPALL24037", "A"),
+            "Population_Annual": ("MDSTMA5POP", "A"),
+            "Unemployed_Persons": ("LAUCN240370000000004", "M"),
+            "Unemployment_Rate": ("MDSTMA5URN", "M"),
+        },
+    },
+    "TAL": {
+        "County": "Talbot",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24041A", "A"),
+            "Civilian_Labor_Force": ("MDTALB1LFN", "M"),
+            "Employment_Count": ("LAUCN240410000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24041A156NCEN", "A"),
+            # No active listings / median listing price for Talbot
+            "Permits_Annual": ("BPPRIV024041", "A"),
+            "Real_GDP": ("REALGDPALL24041", "A"),
+            "Population_Annual": ("MDTALB1POP", "A"),
+            "Unemployed_Persons": ("LAUCN240410000000004", "M"),
+            "Unemployment_Rate": ("MDTALB1URN", "M"),
+        },
+    },
+    "WAS": {
+        "County": "Washington",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24043A", "A"),
+            "Civilian_Labor_Force": ("MDWASH5LFN", "M"),
+            "Employment_Count": ("LAUCN240430000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24043A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24043", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24043", "M"),
+            "Permits_Annual": ("BPPRIV024043", "A"),
+            "Real_GDP": ("REALGDPALL24043", "A"),
+            "Population_Annual": ("MDWASH5POP", "A"),
+            "Unemployed_Persons": ("LAUCN240430000000004", "M"),
+            "Unemployment_Rate": ("MDWASH5URN", "M"),
+        },
+    },
+    "WIC": {
+        "County": "Wicomico",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24045A", "A"),
+            "Civilian_Labor_Force": ("MDWICO5LFN", "M"),
+            "Employment_Count": ("LAUCN240450000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24045A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24045", "M"),  # confirmed Active Listings
+            "Median_Listing_Price": ("MEDLISPRI24045", "M"),
+            "Permits_Annual": ("BPPRIV024045", "A"),
+            "Real_GDP": ("REALGDPALL24045", "A"),
+            "Population_Annual": ("MDWICO5POP", "A"),
+            "Unemployed_Persons": ("LAUCN240450000000004", "M"),
+            "Unemployment_Rate": ("MDWICO5URN", "M"),
+        },
+    },
+    "WOR": {
+        "County": "Worcester",
+        "series": {
+            "HPI_AllTransactions": ("ATNHPIUS24047A", "A"),
+            "Civilian_Labor_Force": ("MDWORC7LFN", "M"),
+            "Employment_Count": ("LAUCN240470000000005", "M"),
+            "Poverty_All_Ages": ("PPAAMD24047A156NCEN", "A"),
+            "Active_Listings": ("ACTLISCOU24047", "M"),
+            "Median_Listing_Price": ("MEDLISPRI24047", "M"),
+            "Permits_Annual": ("BPPRIV024047", "A"),
+            "Real_GDP": ("REALGDPALL24047", "A"),
+            "Population_Annual": ("MDWORC7POP", "A"),
+            "Unemployed_Persons": ("LAUCN240470000000004", "M"),
+            "Unemployment_Rate": ("MDWORC7URN", "M"),
+        },
+    },
+}
+
+# from masterdatasetmulticounty_counties import COUNTIES  # optional import if separated
+
 
 # ======================================================
 # HELPER FUNCTIONS
@@ -188,3 +581,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+print("\n✅ FRED pipeline completed successfully and ready for Tableau integration!")
