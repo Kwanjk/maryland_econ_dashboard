@@ -1,12 +1,12 @@
 # Federal Reserve Economic Data (FRED) API
 # Written by Lily Gates
 # Created: 10/2025
-# Last Updated: 11/6/2025 
+# Last Updated: 11/17/2025 
 
-# Things to Consider Installing (only once)
+# Things to instal if haven't already (only once)
     # Install the Fred API "pip install fredapi"
     # Install openpyxl in order to open .xlsx files in pandas through "pip install openpyxl"
-    # Install pyyaml in order to retrieve hidden API saved in a YAML file
+    # Install pyyaml in order to retrieve hidden API saved in a YAML file through "pip install PyYAML"
 
 import pandas as pd  # Data cleaning
 from fredapi import Fred  # Accessing data
@@ -15,7 +15,6 @@ import yaml  # Load API key from a YAML file for security purposes
 import re  # For file naming manipulation
 import time  # To buffer API requests
 from urllib.error import HTTPError  # Handle API request limit
-
 
 # ------------------------------- #
 # Access FRED API with unique key #
@@ -30,6 +29,61 @@ FRED_API_KEY = keys["fred_api"]
 # Initialize FRED client
 fred = Fred(api_key=FRED_API_KEY)
 SLEEP_TIME = 0.25  # To avoid rate limiting
+
+# ------------------------------------ #
+# Create time buffers between requests #
+# ------------------------------------ #
+
+SLEEP_TIME = 0.5  # seconds between requests
+MAX_RETRIES = 3   # number of retries if rate limit hit
+
+def safe_get_series_info(fred, series_id, retries=MAX_RETRIES):
+    """Fetch series metadata with retries on rate limit errors."""
+    for attempt in range(retries):
+        try:
+            return fred.get_series_info(series_id)
+        except ValueError as e:
+            if "Too Many Requests" in str(e):
+                wait = 5 * (attempt + 1)  # Exponential backoff
+                print(f"[WARNING] Rate limit hit for {series_id}. Waiting {wait}s before retry...")
+                time.sleep(wait)
+            else:
+                raise
+    raise ValueError(f"Failed to fetch series {series_id} after {retries} attempts.")
+
+def safe_get_series(fred, series_id, retries=MAX_RETRIES):
+    """Fetch series data with retries on rate limit errors."""
+    for attempt in range(retries):
+        try:
+            return fred.get_series(series_id)
+        except ValueError as e:
+            if "Too Many Requests" in str(e):
+                wait = 5 * (attempt + 1)
+                print(f"[WARNING] Rate limit hit for data {series_id}. Waiting {wait}s before retry...")
+                time.sleep(wait)
+            else:
+                raise
+    raise ValueError(f"Failed to fetch series data {series_id} after {retries} attempts.")
+
+# ------------------------------- #
+# Helper Function for File Naming #
+# ------------------------------- #
+
+# Ensure snake_case and proper naming convention
+def to_snake_case(s):
+    """
+    Convert a string to snake_case suitable for filenames:
+    - lowercase
+    - spaces and hyphens replaced with underscores
+    - remove parentheses, slashes, colons, and other special characters
+    - collapse multiple underscores
+    """
+    s = s.lower()                      # lowercase
+    s = re.sub(r"[ /\\\-]", "_", s)    # replace space, /, \, - with _
+    s = re.sub(r"[^a-z0-9_]", "", s)   # remove all non-alphanumeric and non-underscore chars
+    s = re.sub(r"_+", "_", s)          # collapse multiple underscores
+    s = s.strip("_")                    # remove leading/trailing underscores
+    return s
 
 # -------------------------------- #
 # Loading Data with Series ID Info #
@@ -65,71 +119,19 @@ state_series_id_df = pd.read_excel(file_path, sheet_name=f"{state_sheet}")
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Folder for county-level outputs
-county_output_folder = os.path.join(script_dir, "csv_outputs", "county_data")
+county_output_folder = os.path.join(script_dir, "fred_csv_outputs", "county_data")
 os.makedirs(county_output_folder, exist_ok=True)
     # Base folder for county data
-county_output_base = "csv_outputs/county_data"
+county_output_base = "fred_csv_outputs/county_data"
 
 # Folder for state-level outputs
-state_output_folder = os.path.join(script_dir, "csv_outputs", "state_data")
+state_output_folder = os.path.join(script_dir, "fred_csv_outputs", "state_data")
 os.makedirs(state_output_folder, exist_ok=True)
     # Base folder for state data
-state_output_base = "csv_outputs/state_data"
+state_output_base = "fred_csv_outputs/state_data"
 
 print(f"[INFO] County output folder created: {county_output_folder}")
 print(f"[INFO] State output folder created: {state_output_folder}")
-
-# Ensure snake_case and proper naming convention
-def to_snake_case(s):
-    """
-    Convert a string to snake_case suitable for filenames:
-    - lowercase
-    - spaces and hyphens replaced with underscores
-    - remove parentheses, slashes, colons, and other special characters
-    - collapse multiple underscores
-    """
-    s = s.lower()                      # lowercase
-    s = re.sub(r"[ /\\\-]", "_", s)    # replace space, /, \, - with _
-    s = re.sub(r"[^a-z0-9_]", "", s)   # remove all non-alphanumeric and non-underscore chars
-    s = re.sub(r"_+", "_", s)          # collapse multiple underscores
-    s = s.strip("_")                    # remove leading/trailing underscores
-    return s
-
-
-# ------------------------------------ #
-# Create time buffers between requests #
-# ------------------------------------ #
-
-SLEEP_TIME = 0.5  # seconds between requests
-MAX_RETRIES = 3   # number of retries if rate limit hit
-
-def safe_get_series_info(fred, series_id, retries=MAX_RETRIES):
-    """Fetch series metadata with retries on rate limit errors."""
-    for attempt in range(retries):
-        try:
-            return fred.get_series_info(series_id)
-        except ValueError as e:
-            if "Too Many Requests" in str(e):
-                wait = 5 * (attempt + 1)  # exponential backoff
-                print(f"[WARNING] Rate limit hit for {series_id}. Waiting {wait}s before retry...")
-                time.sleep(wait)
-            else:
-                raise
-    raise ValueError(f"Failed to fetch series {series_id} after {retries} attempts.")
-
-def safe_get_series(fred, series_id, retries=MAX_RETRIES):
-    """Fetch series data with retries on rate limit errors."""
-    for attempt in range(retries):
-        try:
-            return fred.get_series(series_id)
-        except ValueError as e:
-            if "Too Many Requests" in str(e):
-                wait = 5 * (attempt + 1)
-                print(f"[WARNING] Rate limit hit for data {series_id}. Waiting {wait}s before retry...")
-                time.sleep(wait)
-            else:
-                raise
-    raise ValueError(f"Failed to fetch series data {series_id} after {retries} attempts.")
 
 
 #################################################
@@ -152,7 +154,7 @@ for idx, row in county_series_id_df.iterrows():
 
     for col in county_series_id_df.columns[1:]:
         series_id = row[col]
-        if pd.isna(series_id) or series_id == "":
+        if pd.isna(series_id) or series_id == "":  # Skips blanks
             continue
 
         # Prepare file path
@@ -160,8 +162,14 @@ for idx, row in county_series_id_df.iterrows():
         col_snake_case = to_snake_case(col)
         out_path = os.path.join(county_folder, f"{county_snake_case}_{col_snake_case}.csv")
 
-        # TROUBLESHOOTING -- If going over request limit...
-        # OPTIONAL -- Skip if already downloaded
+        # -------------------------------------------------------
+        # LEAVE THIS SECTION COMMENTED OUT (unless special case)
+        # -------------------------------------------------------
+
+        # This will will make it so it executres calls for data that hasn't already been saved
+            # Can be helpful if going over request limit
+            # Skips calling for data if it was previously downloaded
+            # Caution: It is wise to keep this commented-out so old downloaded data can be overwritten
         #if os.path.exists(out_path):
         #    print(f"[INFO] File already exists, skipping: {os.path.relpath(out_path)}\n")
         #    continue
@@ -169,16 +177,34 @@ for idx, row in county_series_id_df.iterrows():
         # ---------------------
         # Fetch metadata
         # ---------------------
+        
+        # Sets default values to None
+        title = source = freq = obs_start = obs_end = None
+
         try:
             meta = fred.get_series_info(series_id)
-            title = meta.get("title", None)
-            source = meta.get("source_name", None)
-            freq = meta.get("frequency_short", None)
-            obs_start = meta.get("observation_start", None)
-            obs_end = meta.get("observation_end", None)
         except Exception as e:
             print(f"[WARN] Could not fetch metadata for {series_id}: {e}. Skipping metadata.")
-            title = source = freq = obs_start = obs_end = None
+        
+        calls = ["title", "source_name", "frequency_short", "observation_start", "observation_end"]
+        metadata = []
+    
+        for element in calls:
+            
+            x = None  # Default is None
+
+            try:
+                x = meta.get(element, None)
+            except Exception as e:
+                print(f"[WARN] Could not fetch metadata for {element}: {e}. Skipping metadata.")
+
+            metadata.append(x)
+
+        title = metadata[0]  # Data from calls[0]
+        source = metadata[1]
+        freq = metadata[2]
+        obs_start = metadata[3]
+        obs_end = metadata[4]
 
         # Print metadata confirmation
         print(f"County: {county} | Series: {col} ({series_id})")
@@ -194,18 +220,18 @@ for idx, row in county_series_id_df.iterrows():
         # -------------------------
         retries = 0
         max_retries = 8
-        wait_seconds = 10  # initial wait time for exponential backoff
+        wait_seconds = 10  # Initial wait time for exponential backoff
 
         while retries < max_retries:
             try:
                 data = fred.get_series(series_id)
-                break  # success, exit retry loop
+                break  # Success, exit retry loop
             except HTTPError as e:
                 if e.code == 429:
                     retries += 1
                     print(f"[WARN] Rate limit hit for {series_id}. Waiting {wait_seconds} seconds before retry {retries}/{max_retries}...")
                     time.sleep(wait_seconds)
-                    wait_seconds *= 2  # exponential backoff
+                    wait_seconds *= 2  # Exponential backoff
                 else:
                     print(f"[ERROR] HTTPError for {series_id}: {e}. Skipping.")
                     data = None
@@ -238,8 +264,6 @@ for idx, row in county_series_id_df.iterrows():
 
          # Short sleep to spread requests and reduce hitting rate limit
         time.sleep(0.75)  # Could change to anywhere from 0.25 or 0.75
-
-'''
 
 
 #################################################
@@ -304,4 +328,3 @@ for idx, row in state_series_id_df.iterrows():
     relative_path = os.path.relpath(out_path, start=os.getcwd())
 
     print(f"[INFO] File saved to:\n{relative_path}\n")
-'''
