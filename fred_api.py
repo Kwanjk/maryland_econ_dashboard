@@ -16,24 +16,11 @@ import re  # For file naming manipulation
 import time  # To buffer API requests
 from urllib.error import HTTPError  # Handle API request limit
 
-# ------------------------------- #
-# Access FRED API with unique key #
-# ------------------------------- #
+# -------------------------------- #
+# Setting up for FRED API Requests #
+# -------------------------------- #
 
-# Load API key from YAML -- key hidden for security reasons
-with open("api_keys.yaml", "r") as f:
-    keys = yaml.safe_load(f)
-
-FRED_API_KEY = keys["fred_api"]
-
-# Initialize FRED client
-fred = Fred(api_key=FRED_API_KEY)
-SLEEP_TIME = 0.25  # To avoid rate limiting
-
-# ------------------------------------ #
-# Create time buffers between requests #
-# ------------------------------------ #
-
+# Create time buffers between API requests
 SLEEP_TIME = 0.5  # seconds between requests
 MAX_RETRIES = 3   # number of retries if rate limit hit
 
@@ -84,6 +71,23 @@ def to_snake_case(s):
     s = re.sub(r"_+", "_", s)          # collapse multiple underscores
     s = s.strip("_")                    # remove leading/trailing underscores
     return s
+
+# ------------------------------- #
+# Access FRED API with unique key #
+# ------------------------------- #
+# Ensures that code is being run in the appropriate directory (which also contains the .yaml file)
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
+current_directory = os.getcwd()
+#print(f"The current working directory is: {current_directory}")
+
+# Load API key from YAML -- key hidden for security reasons
+with open("api_keys.yaml", "r") as f:
+    keys = yaml.safe_load(f)
+
+FRED_API_KEY = keys["fred_api"]
+
+# Initialize FRED client
+fred = Fred(api_key=FRED_API_KEY)
 
 # -------------------------------- #
 # Loading Data with Series ID Info #
