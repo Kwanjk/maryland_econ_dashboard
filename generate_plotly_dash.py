@@ -18,20 +18,25 @@
 
 # -----------------------------------------------------
 
-import pandas as pd  # Data cleaning
-from fredapi import Fred  # Accessing data
-import os  # File management (reading and saving)
-import yaml  # Load API key from a YAML file for security purposes
-import re  # For file naming manipulation
-import time  # To buffer API requests
-from urllib.error import HTTPError  # Handle API request limit
-from dash import Dash, html, dcc, callback, Output, Input  # To make interactive dashboards
-import plotly.express as px  # To make interactive graphs
+# ---------------------------------------- #
+# Import Libraries for Data & File Handling
+# ---------------------------------------- #
+import os
+import re
+from pathlib import Path
+from urllib.error import HTTPError
+
+import pandas as pd
+from fredapi import Fred
+import yaml
+
+# ---------------------------------------- #
+# Import Libraries for Dash & Visualization
+# ---------------------------------------- #
+from dash import Dash, html, dcc, callback, Output, Input
+import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from ipywidgets import interact, Dropdown
-
-from pathlib import Path  # To search through files/documents
 
 # ------------------------------------------- #
 # Ensure Current Working Directory is correct #
@@ -276,10 +281,157 @@ for county, groups in county_group_file_dict.items():
         for f in files:
             print(f"    {f}")
 
+##############################################################
 
 # ---------------------------------------------------------- #
-##############################################################
+# Create a mapping for friendly metric labels
 # ---------------------------------------------------------- #
+def make_friendly_label(metric_name: str) -> str:
+    """
+    Convert raw metric name to a readable friendly label.
+    Example: 'all_transaction_house_price_index' -> 'All Transaction House Price Index'
+    """
+    # Replace underscores with spaces, capitalize words
+    return metric_name.replace("_", " ").title()
+
+# Create dictionary dynamically from county_metrics_df
+metric_label_dict = {m: make_friendly_label(m) for m in county_metrics_df["metric"].unique()}
+
+# ---------------------------------------------------------- #
+# Updated get_group_data_for_county using friendly labels
+# ---------------------------------------------------------- #
+def get_group_data_for_county(county_name_pretty: str, group_name: str) -> pd.DataFrame:
+    county_snake = to_snake_case(county_name_pretty)
+    county_folder = county_base_dir / county_snake
+
+    if not county_folder.exists():
+        raise FileNotFoundError(f"No folder found for county: {county_folder}")
+
+    metrics_in_group = county_metrics_df[county_metrics_df['group'] == group_name]['metric'].tolist()
+    frames = []
+
+    for metric in metrics_in_group:
+        csv_path = county_folder / f"{county_snake}_{metric}.csv"
+        if not csv_path.exists():
+            continue
+
+        df = pd.read_csv(csv_path)
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"])
+
+        # Use friendly label for hover
+        df["metric"] = metric_label_dict.get(metric, metric)
+        frames.append(df)
+
+    if not frames:
+        raise ValueError(f"No {group_name} metrics found for county: {county_name_pretty}")
+
+    return pd.concat(frames, ignore_index=True)
+
+# ---------------------------------------------------------- #
+# Dash callback already works with friendly labels
+# ---------------------------------------------------------- #
+@callback(
+    Output("metrics_graph", "figure"),
+    Input("county_dropdown", "value"),
+    Input("group_dropdown", "value")
+)
+def update_metrics_graph(county_name_pretty, group_name):
+    df = get_group_data_for_county(county_name_pretty, group_name)
+    fig = create_group_figure(df, county_name_pretty)
+    return fig
+
+
+##############################################################
+
+# ---------------------------------------- #
+# Create Dash App
+# ---------------------------------------- #
+app = Dash(__name__)
+
+# Dynamic dropdown options
+county_options = sorted(county_list)  # Pretty names from Excel
+group_options = sorted(county_metrics_df["group"].unique())  # All groups dynamically
+
+app.layout = html.Div([
+    html.H2("Maryland County Metrics"),
+    html.Div([
+        html.Label("Select County:"),
+        dcc.Dropdown(
+            id="county_dropdown",
+            options=[{"label": c, "value": c} for c in county_options],
+            value=county_options[0],
+            clearable=False,
+            style={"width": "300px"}
+        ),
+    ]),
+    html.Div([
+        html.Label("Select Metric Group:"),
+        dcc.Dropdown(
+            id="group_dropdown",
+            options=[{"label": g.title(), "value": g} for g in group_options],
+            value=group_options[0],
+            clearable=False,
+            style={"width": "300px"}
+        ),
+    ]),
+    dcc.Graph(id="metrics_graph")
+])
+
+# ---------------------------------------- #
+# Function to create Plotly figure
+# ---------------------------------------- #
+def create_group_figure(df, county_name, group_name):
+    metrics = sorted(df["metric"].unique())
+    n_rows = len(metrics)
+
+    fig = make_subplots(
+        rows=n_rows, cols=1, shared_xaxes=True,
+        subplot_titles=metrics, vertical_spacing=0.06
+    )
+
+    for i, m in enumerate(metrics, start=1):
+        df_m = df[df["metric"] == m]
+        fig.add_trace(
+            go.Scatter(
+                x=df_m["date"],
+                y=df_m["value"],
+                mode="lines+markers",
+                name=m,
+                showlegend=False,
+                marker=dict(size=6),
+                hovertemplate="<b>%{fullData.name}</b><br>Date: %{x|%Y-%m-%d}<br>Value: %{y:.2f}<extra></extra>"
+            ),
+            row=i, col=1
+        )
+        fig.update_yaxes(title_text="Value", row=i, col=1)
+
+    fig.update_xaxes(title_text="Date", row=n_rows, col=1)
+    fig.update_layout(
+        height=250*n_rows,
+        title_text=f"{county_name} – {group_name.title()} Metrics Over Time"
+    )
+    return fig
+
+# ---------------------------------------- #
+# Callback to update figure based on dropdown
+# ---------------------------------------- #
+@app.callback(
+    Output("metrics_graph", "figure"),
+    Input("county_dropdown", "value"),
+    Input("group_dropdown", "value")
+)
+def update_metrics_graph(county_name_pretty, group_name):
+    # Dynamically fetch metrics for selected county and group
+    df = get_group_data_for_county(county_name_pretty, group_name)
+    return create_group_figure(df, county_name_pretty, group_name)
+
+# ---------------------------------------- #
+# Run app
+# ---------------------------------------- #
+if __name__ == "__main__":
+    app.run_server(debug=True)
+
 
 
 ######################################################
