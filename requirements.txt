@@ -1,0 +1,5 @@
+pandas
+fredapi
+tqdm
+tableauhyperapi
+openpyxl
