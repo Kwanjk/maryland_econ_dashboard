@@ -1,9 +1,8 @@
 # Federal Reserve Economic Data (FRED) API
-# Written by Lily Gates
 # Created: 10/2025
 # Last Updated: 11/17/2025 
 
-# Things to instal if haven't already (only once)
+# Things to install if haven't already (only once)
     # Install the Fred API "pip install fredapi"
     # Install openpyxl in order to open .xlsx files in pandas through "pip install openpyxl"
     # Install pyyaml in order to retrieve hidden API saved in a YAML file through "pip install PyYAML"
