@@ -448,25 +448,49 @@ def create_group_figure(df, county_name, group_name):
     )
     return fig
 
-# ---------------------------------------- #
-# Single callback (DRY)
-# ---------------------------------------- #
+# --------------------------------------- #
+# Single callback with "No Data" Handling #
+# --------------------------------------- #
+
 @app.callback(
     Output("metrics_graph", "figure"),
     Input("county_dropdown", "value"),
     Input("group_dropdown", "value")
 )
+
 def update_metrics_graph(county_name_pretty, group_name):
-    # Fetch data dynamically
-    df = get_group_data_for_county(county_name_pretty, group_name)
+    try:
+        # Fetch data dynamically
+        df = get_group_data_for_county(county_name_pretty, group_name)
+    except (FileNotFoundError, ValueError):
+        # If no data is found, return a simple figure with message
+        fig = go.Figure()
+        fig.add_annotation(
+            x=0.5, y=0.5,
+            text=f"No {group_name.title()} data available for {county_name_pretty}.",
+            showarrow=False,
+            font=dict(size=16),
+            xref="paper",
+            yref="paper"
+        )
+        fig.update_layout(
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            title=f"{county_name_pretty} – {group_name.title()} Metrics Over Time",
+            height=300
+        )
+        return fig
+
+    # Otherwise, return the usual figure
     return create_group_figure(df, county_name_pretty, group_name)
 
-# ---------------------------------------- #
-# Run app
-# ---------------------------------------- #
+# ------- #
+# Run app #
+# ------- #
+
 if __name__ == "__main__":
     app.run_server(debug=True)
-    
+
 """
 
 TODO Not sure if this is necessary
