@@ -137,15 +137,15 @@ try:
 except NameError:
     script_dir = os.getcwd()
 
-employment_count_dir = os.path.join(
+separate_dir = os.path.join(
     script_dir,
     "bls_csv_outputs",
     "county_data",
-    "employment_count"
+    "separate"
 )
 
-os.makedirs(employment_count_dir, exist_ok=True)
-print(f"[INFO] Saving files to: {employment_count_dir}")
+os.makedirs(separate_dir, exist_ok=True)
+print(f"[INFO] Saving files to: {separate_dir}")
 
 # =============================================================================
 # [MODIFICATION START] - Filename Mapping & Batched Request Loop
@@ -204,12 +204,9 @@ for i in range(0, len(all_series_ids), chunk_size):
             
             series_id = series['seriesID']
             
-            # [OLD CODE] Used the ID as the filename
-            # filepath = os.path.join(employment_count_dir, f"{series_id}.csv")
-            
-            # [NEW CODE] Use the dictionary to find the readable name
+            # Use the dictionary to find the readable name
             filename_base = id_to_filename.get(series_id, series_id)
-            filepath = os.path.join(employment_count_dir, f"{filename_base}.csv")
+            filepath = os.path.join(separate_dir, f"{filename_base}.csv")
 
             with open(filepath, "w", newline="") as f:
                 writer = csv.writer(f)
@@ -241,7 +238,9 @@ for i in range(0, len(all_series_ids), chunk_size):
     # Be nice to the API
     time.sleep(SLEEP_TIME)
 
-print("[INFO] All downloads complete.")
+# Script completion confirmation statement
+print("[INFO] All downloads complete!")
+print("[INFO] Files saved in: bls_csv_outputs/county_data/separate")
 
 # --------------------------------------------------------- #
 # POST-PROCESSING: Merge 96 files into 24 County Files      #
@@ -253,7 +252,7 @@ print("\n[INFO] Starting merge process...")
 county_dfs = {}
 
 # 1. Loop through all CSVs in the output folder
-for filename in os.listdir(employment_count_dir):
+for filename in os.listdir(separate_dir):
     if filename.endswith(".csv"):
         # filename example: "allegany_unemployment_rate.csv"
         
@@ -285,7 +284,7 @@ for filename in os.listdir(employment_count_dir):
             continue
             
         # Read the CSV
-        file_path = os.path.join(employment_count_dir, filename)
+        file_path = os.path.join(separate_dir, filename)
         df = pd.read_csv(file_path)
         
         # Keep only date and value
@@ -324,6 +323,5 @@ for county_name, df_list in county_dfs.items():
 
 
 # Script completion confirmation statement
-print("="*60)
-print(f"[INFO] Process Complete.\nMerged files saved in:\n{merged_output_dir}")
-print("="*60)
+print("[INFO] Merging process complete!")
+print("[INFO] Merged files saved in: bls_csv_outputs/county_data/merged")
