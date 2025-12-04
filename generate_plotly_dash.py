@@ -370,6 +370,97 @@ def get_group_data_for_county(county_name_pretty: str, group_name: str) -> pd.Da
 
 ##############################################################
 
+# ------------------------------------ #
+# Create, View, and Save Plotly Graphs #
+# ------------------------------------ #
+
+# Define your output directory
+plotly_outputs_dir = Path("plotly_outputs")
+plotly_outputs_dir.mkdir(parents=True, exist_ok=True)  # create if doesn't exist
+
+def create_group_figure(df, county_name, group_name):
+    """
+    Create a Plotly figure for all metrics in a group for a given county.
+
+    Parameters:
+    - df: DataFrame containing 'date', 'value', and 'metric' columns
+    - county_name: Friendly county name for the figure title
+    - group_name: Metric group name for the figure title
+
+    Returns:
+    - Plotly Figure object
+    """
+    metrics = sorted(df["metric"].unique())
+    n_rows = len(metrics)
+
+    fig = make_subplots(
+        rows=n_rows, cols=1, shared_xaxes=True,
+        subplot_titles=metrics, vertical_spacing=0.06
+    )
+
+    for i, m in enumerate(metrics, start=1):
+        df_m = df[df["metric"] == m]
+        fig.add_trace(
+            go.Scatter(
+                x=df_m["date"],
+                y=df_m["value"],
+                mode="lines+markers",
+                name=m,
+                showlegend=False,
+                marker=dict(size=6),
+                hovertemplate="<b>%{fullData.name}</b><br>Date: %{x|%Y-%m-%d}<br>Value: %{y:.2f}<extra></extra>"
+            ),
+            row=i, col=1
+        )
+        fig.update_yaxes(title_text="Value", row=i, col=1)
+
+    fig.update_xaxes(title_text="Date", row=n_rows, col=1)
+    fig.update_layout(
+        height=250*n_rows,
+        title_text=f"{county_name} – {group_name.title()} Metrics Over Time"
+    )
+    return fig
+
+def show_county_group_graph(county_name_pretty: str, group_name: str, save_html: bool = False, html_path: str = None):
+    """
+    Quickly display a Plotly graph for a given county and metric group
+    without running the full Dash app.
+
+    Parameters:
+    - county_name_pretty: Friendly county name (e.g., "Allegany")
+    - group_name: Metric group name (e.g., "housing")
+    - save_html: Whether to save the figure as an HTML file
+    - html_path: File path to save HTML. If None, will default to '<plotly_outputs_dir>/<county>_<group>.html'
+    """
+    df = get_group_data_for_county(county_name_pretty, group_name)
+    fig = create_group_figure(df, county_name_pretty, group_name)
+    
+    if save_html:
+        if html_path is None:
+            html_path = plotly_outputs_dir / f"{to_snake_case(county_name_pretty)}_{group_name}.html"
+        fig.write_html(html_path)
+        print(f"Saved Plotly figure to: {html_path}")
+
+    fig.show()
+
+
+# --------------------- #
+# Running Plotly Script #
+# --------------------- #
+
+# Example: Display and save Allegany county housing metrics
+county_name = "Allegany"
+group_name = "housing"
+
+show_county_group_graph(county_name, group_name, save_html=True)
+
+# Print a confirmation message
+print(f"[INFO] Plotly graph for {county_name} ({group_name}) has been displayed and saved in '{plotly_outputs_dir}'")
+
+
+"""
+##############################################################
+
 # ---------------------- #
 # Create Plotly Dash App #
 # ---------------------- #
@@ -489,9 +580,11 @@ def update_metrics_graph(county_name_pretty, group_name):
 # ------- #
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run(debug=True)
 
-"""
+
+##############################################################
+
 
 TODO Not sure if this is necessary
 
