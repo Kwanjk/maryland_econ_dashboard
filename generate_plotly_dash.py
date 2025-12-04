@@ -33,7 +33,8 @@ import yaml
 # ---------------------------------------- #
 # Import Libraries for Dash & Visualization
 # ---------------------------------------- #
-from dash import Dash, html, dcc, callback, Output, Input
+from dash import Dash, html, dcc, callback
+from dash.dependencies import Input, Output
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -232,9 +233,7 @@ print("="*60)
 print("County-Level Metrics DataFrame (grouped):")
 print(county_metrics_df)
 
-
 # Print file names sorted by metric group
-# Note VERY long, to avoid Terminal view clutter, keep commented out
 for group, files in group_files_only.items():
     print(f"\nGroup: {group}")
     for f in sorted(files):
@@ -369,11 +368,105 @@ def get_group_data_for_county(county_name_pretty: str, group_name: str) -> pd.Da
 
     return pd.concat(frames, ignore_index=True)
 
-
 ##############################################################
 
+# ---------------------- #
+# Create Plotly Dash App #
+# ---------------------- #
 
+# Initialize app
+app = Dash(__name__)
 
+# Dynamic dropdown options
+county_options = sorted(county_list)  # From Excel (pretty names)
+group_options = sorted(county_metrics_df["group"].unique())  # From grouped metrics
+
+# App layout
+app.layout = html.Div([
+    html.H2("Maryland County Metrics"),
+    
+    html.Div([
+        html.Label("Select County:"),
+        dcc.Dropdown(
+            id="county_dropdown",
+            options=[{"label": c, "value": c} for c in county_options],
+            value=county_options[0],
+            clearable=False,
+            style={"width": "300px"}
+        ),
+    ], style={"margin-bottom": "20px"}),
+    
+    html.Div([
+        html.Label("Select Metric Group:"),
+        dcc.Dropdown(
+            id="group_dropdown",
+            options=[{"label": g.title(), "value": g} for g in group_options],
+            value=group_options[0],
+            clearable=False,
+            style={"width": "300px"}
+        ),
+    ], style={"margin-bottom": "20px"}),
+    
+    dcc.Graph(id="metrics_graph")
+])
+
+# ------------------------- #
+# Function to create figure #
+# ------------------------- #
+
+def create_group_figure(df, county_name, group_name):
+    metrics = sorted(df["metric"].unique())
+    n_rows = len(metrics)
+
+    fig = make_subplots(
+        rows=n_rows, cols=1,
+        shared_xaxes=True,
+        subplot_titles=metrics,
+        vertical_spacing=0.06
+    )
+
+    for i, m in enumerate(metrics, start=1):
+        df_m = df[df["metric"] == m]
+        fig.add_trace(
+            go.Scatter(
+                x=df_m["date"],
+                y=df_m["value"],
+                mode="lines+markers",
+                name=m,
+                showlegend=False,
+                marker=dict(size=6),
+                hovertemplate="<b>%{fullData.name}</b><br>Date: %{x|%Y-%m-%d}<br>Value: %{y:.2f}<extra></extra>"
+            ),
+            row=i, col=1
+        )
+        fig.update_yaxes(title_text="Value", row=i, col=1)
+
+    fig.update_xaxes(title_text="Date", row=n_rows, col=1)
+    fig.update_layout(
+        height=250*n_rows,
+        title_text=f"{county_name} – {group_name.title()} Metrics Over Time"
+    )
+    return fig
+
+# ---------------------------------------- #
+# Single callback (DRY)
+# ---------------------------------------- #
+@app.callback(
+    Output("metrics_graph", "figure"),
+    Input("county_dropdown", "value"),
+    Input("group_dropdown", "value")
+)
+def update_metrics_graph(county_name_pretty, group_name):
+    # Fetch data dynamically
+    df = get_group_data_for_county(county_name_pretty, group_name)
+    return create_group_figure(df, county_name_pretty, group_name)
+
+# ---------------------------------------- #
+# Run app
+# ---------------------------------------- #
+if __name__ == "__main__":
+    app.run_server(debug=True)
+    
 """
 
 TODO Not sure if this is necessary
@@ -391,8 +484,6 @@ def update_metrics_graph(county_name_pretty, group_name):
     df = get_group_data_for_county(county_name_pretty, group_name)
     fig = create_group_figure(df, county_name_pretty)
     return fig
-
-
 
 
 
@@ -485,7 +576,6 @@ def update_metrics_graph(county_name_pretty, group_name):
 # ---------------------------------------- #
 if __name__ == "__main__":
     app.run_server(debug=True)
-
 
 
 ######################################################
