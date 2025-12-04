@@ -247,3 +247,84 @@ for i in range(0, len(all_series_ids), chunk_size):
     time.sleep(SLEEP_TIME)
 
 print("[INFO] All downloads complete.")
+
+# --------------------------------------------------------- #
+# POST-PROCESSING: Merge 96 files into 24 County Files      #
+# --------------------------------------------------------- #
+
+print("\n[INFO] Starting merge process...")
+
+# Dictionary to store dataframes: {'allegany': [df_emp, df_unemp, ...]}
+county_dfs = {}
+
+# 1. Loop through all CSVs in the output folder
+for filename in os.listdir(employment_count_dir):
+    if filename.endswith(".csv"):
+        # filename example: "allegany_unemployment_rate.csv"
+        
+        # Split the filename to get the county and the metric
+        # We assume the format is always "{county}_{metric}.csv"
+        # This is a bit tricky since counties can have underscores (prince_georges)
+        # So we look at your 'county_series_melted' map to be safe, 
+        # OR we can just use string manipulation if we trust the naming convention.
+        
+        # Let's use a smarter way: parsing the filename
+        # Remove .csv
+        name_no_ext = filename.replace(".csv", "")
+        
+        # Identify the metric from the end of the string
+        if name_no_ext.endswith("_employment"):
+            county_name = name_no_ext.replace("_employment", "")
+            metric_col = "Employment"
+        elif name_no_ext.endswith("_unemployment_count"):
+            county_name = name_no_ext.replace("_unemployment_count", "")
+            metric_col = "Unemployment Count"
+        elif name_no_ext.endswith("_unemployment_rate"):
+            county_name = name_no_ext.replace("_unemployment_rate", "")
+            metric_col = "Unemployment Rate"
+        elif name_no_ext.endswith("_labor_force"):
+            county_name = name_no_ext.replace("_labor_force", "")
+            metric_col = "Labor Force"
+        else:
+            print(f"  [SKIP] Could not identify metric for: {filename}")
+            continue
+            
+        # Read the CSV
+        file_path = os.path.join(employment_count_dir, filename)
+        df = pd.read_csv(file_path)
+        
+        # Keep only date and value
+        df = df[['date', 'value']]
+        
+        # Rename 'value' to the specific metric (e.g., 'Unemployment Rate')
+        df = df.rename(columns={'value': metric_col})
+        
+        # Add to our dictionary
+        if county_name not in county_dfs:
+            county_dfs[county_name] = []
+        county_dfs[county_name].append(df)
+
+# 2. Merge and Save
+merged_output_dir = os.path.join(script_dir, "bls_csv_outputs", "county_data", "merged")
+os.makedirs(merged_output_dir, exist_ok=True)
+
+for county_name, df_list in county_dfs.items():
+    if not df_list:
+        continue
+        
+    # Start with the first dataframe in the list
+    merged_df = df_list[0]
+    
+    # Merge the rest
+    for next_df in df_list[1:]:
+        merged_df = pd.merge(merged_df, next_df, on='date', how='outer')
+        
+    # Sort by date
+    merged_df = merged_df.sort_values('date')
+    
+    # Save
+    save_path = os.path.join(merged_output_dir, f"{county_name}_all_metrics.csv")
+    merged_df.to_csv(save_path, index=False)
+    print(f"  [MERGED] Saved {county_name}_all_metrics.csv")
+
+print("[INFO] Process Complete. Check the 'merged' folder!")
