@@ -2,10 +2,6 @@
 # Created: 11/17/2025
 # Last Updated: 12/03/2025 [MODIFIED]
 
-# Packages to install if haven't already (only once)
-# pip install prettytable
-# pip install requests
-
 import requests
 import json
 import prettytable
@@ -43,6 +39,13 @@ MAX_RETRIES = 3
 # ------------------------------- #
 
 def to_snake_case(s):
+    """
+    Convert a string to snake_case suitable for filenames:
+    - lowercase
+    - spaces and hyphens replaced with underscores
+    - remove parentheses, slashes, colons, and other special characters
+    - collapse multiple underscores
+    """
     s = s.lower()
     s = re.sub(r"[ /\\\-]", "_", s)
     s = re.sub(r"[^a-z0-9_]", "", s)
@@ -134,15 +137,15 @@ try:
 except NameError:
     script_dir = os.getcwd()
 
-employment_count_dir = os.path.join(
+separate_dir = os.path.join(
     script_dir,
     "bls_csv_outputs",
     "county_data",
-    "employment_count"
+    "separate"
 )
 
-os.makedirs(employment_count_dir, exist_ok=True)
-print(f"[INFO] Saving files to: {employment_count_dir}")
+os.makedirs(separate_dir, exist_ok=True)
+print(f"[INFO] Saving files to: {separate_dir}")
 
 # =============================================================================
 # [MODIFICATION START] - Filename Mapping & Batched Request Loop
@@ -165,15 +168,7 @@ all_series_ids = county_series_melted['Series ID'].unique().tolist()
 chunk_size = 25
 print(f"[INFO] Starting download for {len(all_series_ids)} series in batches...")
 
-# [OLD CODE] This was the old hardcoded request
-# data = {
-#     "seriesid": ['LAUCN240010000000005', 'LAUCN240030000000005'],
-#     "startyear": "2011",
-#     "endyear": "2014"
-# }
-# response = requests.post(...)
-
-# [NEW CODE] Loop through the IDs in batches
+# Loop through the IDs in batches
 for i in range(0, len(all_series_ids), chunk_size):
     current_chunk = all_series_ids[i : i + chunk_size]
     print(f"  > Processing batch {i//chunk_size + 1} ({len(current_chunk)} IDs)...")
@@ -209,12 +204,9 @@ for i in range(0, len(all_series_ids), chunk_size):
             
             series_id = series['seriesID']
             
-            # [OLD CODE] Used the ID as the filename
-            # filepath = os.path.join(employment_count_dir, f"{series_id}.csv")
-            
-            # [NEW CODE] Use the dictionary to find the readable name
+            # Use the dictionary to find the readable name
             filename_base = id_to_filename.get(series_id, series_id)
-            filepath = os.path.join(employment_count_dir, f"{filename_base}.csv")
+            filepath = os.path.join(separate_dir, f"{filename_base}.csv")
 
             with open(filepath, "w", newline="") as f:
                 writer = csv.writer(f)
@@ -246,7 +238,9 @@ for i in range(0, len(all_series_ids), chunk_size):
     # Be nice to the API
     time.sleep(SLEEP_TIME)
 
-print("[INFO] All downloads complete.")
+# Script completion confirmation statement
+print("[INFO] All downloads complete!")
+print("[INFO] Files saved in: bls_csv_outputs/county_data/separate")
 
 # --------------------------------------------------------- #
 # POST-PROCESSING: Merge 96 files into 24 County Files      #
@@ -258,7 +252,7 @@ print("\n[INFO] Starting merge process...")
 county_dfs = {}
 
 # 1. Loop through all CSVs in the output folder
-for filename in os.listdir(employment_count_dir):
+for filename in os.listdir(separate_dir):
     if filename.endswith(".csv"):
         # filename example: "allegany_unemployment_rate.csv"
         
@@ -290,7 +284,7 @@ for filename in os.listdir(employment_count_dir):
             continue
             
         # Read the CSV
-        file_path = os.path.join(employment_count_dir, filename)
+        file_path = os.path.join(separate_dir, filename)
         df = pd.read_csv(file_path)
         
         # Keep only date and value
@@ -327,4 +321,7 @@ for county_name, df_list in county_dfs.items():
     merged_df.to_csv(save_path, index=False)
     print(f"  [MERGED] Saved {county_name}_all_metrics.csv")
 
-print("[INFO] Process Complete. Check the 'merged' folder!")
+
+# Script completion confirmation statement
+print("[INFO] Merging process complete!")
+print("[INFO] Merged files saved in: bls_csv_outputs/county_data/merged")
