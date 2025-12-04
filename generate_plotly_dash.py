@@ -143,7 +143,7 @@ group_county_patterns = {
 grouped_county_metrics = {group: [] for group in group_county_patterns.keys()}
 
 for metric in county_metric_list:
-    for group, pattern in group_county_patterns.items():  # corrected
+    for group, pattern in group_county_patterns.items():
         if pattern.search(metric):
             grouped_county_metrics[group].append(metric)
             break
@@ -240,8 +240,9 @@ for group, files in state_group_file_dict.items():
     for f in files:
         print(f)
 
-
-# Dictionary to store COUNTY-LEVEL files by group
+# ----------------------------------------------- #
+# Dictionary to store COUNTY-LEVEL files by group #
+# ----------------------------------------------- #
 
 # Initialize nested dictionary
 county_group_file_dict = {}
@@ -283,9 +284,10 @@ for county, groups in county_group_file_dict.items():
 
 ##############################################################
 
-# ---------------------------------------------------------- #
-# Create a mapping for friendly metric labels
-# ---------------------------------------------------------- #
+# ------------------------------------------------------- #
+# Create a mapping for aesthetic "friendly" metric labels #
+# ------------------------------------------------------- #
+
 def make_friendly_label(metric_name: str) -> str:
     """
     Convert raw metric name to a readable friendly label.
@@ -297,9 +299,10 @@ def make_friendly_label(metric_name: str) -> str:
 # Create dictionary dynamically from county_metrics_df
 metric_label_dict = {m: make_friendly_label(m) for m in county_metrics_df["metric"].unique()}
 
-# ---------------------------------------------------------- #
-# Updated get_group_data_for_county using friendly labels
-# ---------------------------------------------------------- #
+# ----------------------------------- #
+# Get Metrics Data for County + Group #
+# ----------------------------------- #
+
 def get_group_data_for_county(county_name_pretty: str, group_name: str) -> pd.DataFrame:
     county_snake = to_snake_case(county_name_pretty)
     county_folder = county_base_dir / county_snake
@@ -331,6 +334,7 @@ def get_group_data_for_county(county_name_pretty: str, group_name: str) -> pd.Da
 # ---------------------------------------------------------- #
 # Dash callback already works with friendly labels
 # ---------------------------------------------------------- #
+
 @callback(
     Output("metrics_graph", "figure"),
     Input("county_dropdown", "value"),
