@@ -2,10 +2,6 @@
 # Created: 11/17/2025
 # Last Updated: 12/03/2025 [MODIFIED]
 
-# Packages to install if haven't already (only once)
-# pip install prettytable
-# pip install requests
-
 import requests
 import json
 import prettytable
@@ -43,6 +39,13 @@ MAX_RETRIES = 3
 # ------------------------------- #
 
 def to_snake_case(s):
+    """
+    Convert a string to snake_case suitable for filenames:
+    - lowercase
+    - spaces and hyphens replaced with underscores
+    - remove parentheses, slashes, colons, and other special characters
+    - collapse multiple underscores
+    """
     s = s.lower()
     s = re.sub(r"[ /\\\-]", "_", s)
     s = re.sub(r"[^a-z0-9_]", "", s)
@@ -165,15 +168,7 @@ all_series_ids = county_series_melted['Series ID'].unique().tolist()
 chunk_size = 25
 print(f"[INFO] Starting download for {len(all_series_ids)} series in batches...")
 
-# [OLD CODE] This was the old hardcoded request
-# data = {
-#     "seriesid": ['LAUCN240010000000005', 'LAUCN240030000000005'],
-#     "startyear": "2011",
-#     "endyear": "2014"
-# }
-# response = requests.post(...)
-
-# [NEW CODE] Loop through the IDs in batches
+# Loop through the IDs in batches
 for i in range(0, len(all_series_ids), chunk_size):
     current_chunk = all_series_ids[i : i + chunk_size]
     print(f"  > Processing batch {i//chunk_size + 1} ({len(current_chunk)} IDs)...")
@@ -327,4 +322,8 @@ for county_name, df_list in county_dfs.items():
     merged_df.to_csv(save_path, index=False)
     print(f"  [MERGED] Saved {county_name}_all_metrics.csv")
 
-print("[INFO] Process Complete. Check the 'merged' folder!")
+
+# Script completion confirmation statement
+print("="*60)
+print(f"[INFO] Process Complete.\nMerged files saved in:\n{merged_output_dir}")
+print("="*60)
