@@ -42,8 +42,7 @@ from plotly.subplots import make_subplots
 # Ensure Current Working Directory is correct #
 # ------------------------------------------- #
 
-
-print("\nCurrent Working Directory:\n", os.getcwd(), "\n")
+#print("\nCurrent Working Directory:\n", os.getcwd(), "\n")
 
 # Base directories
 state_base_dir = Path("fred_csv_outputs/state_data")
@@ -103,16 +102,20 @@ county_list = county_series_id_df["COUNTY"].unique().tolist()
 # Convert to snake_case using the function
 county_list_snake = [to_snake_case(c) for c in county_list]
 
+"""
+# Keep uncommented to reduce visual clutter in Terminal view when running
 print("="*60)
 print("ALL COUNTIES IN MARYLAND")
 print("="*60)
 
-print("Original counties:")
-print(county_list)
+#print("Original counties:")
+for county in county_list:
+    print(county)
 
 #print("-"*60)
 #print("Snake-case counties:")
 #print(county_list_snake)
+"""
 
 # ----------------------------------------------- #
 # Create set to store unique COUNTY-LEVEL metrics #
@@ -164,18 +167,6 @@ for group, metrics in grouped_county_metrics.items():
 
 county_metrics_df = pd.DataFrame(rows)
 
-# --- Output ---
-
-print("="*60)
-print("COUNTY-LEVEL METRICS IN MARYLAND")
-print("="*60)
-
-#print("County-Level Metrics List:")
-#print(county_metric_list)
-
-print("County-Level Metrics DataFrame (grouped):")
-print(county_metrics_df)
-
 # ----------------------------------------------- #
 # Dictionary to store COUNTY-LEVEL files by group #
 # ----------------------------------------------- #
@@ -210,14 +201,44 @@ for county in county_list_snake:
         # Add to nested dictionary
         county_group_file_dict.setdefault(county, {})[group] = matching_files
 
+# ----------------------------------------------- #
+# Display Output: Just Group and Files (no County)
+# ----------------------------------------------- #
 
-# --- Example output ---
-for county, groups in county_group_file_dict.items():
-    print(f"\nCounty: {county}")
-    for group, files in groups.items():
-        print(f"  Group: {group}")
+# Collect unique files for each group across all counties
+group_files_only = {group: set() for group in ["housing", "labor", "economy"]}
+
+for county_name, county_groups in county_group_file_dict.items():
+    for group, files in county_groups.items():
         for f in files:
-            print(f"    {f}")
+            file_name = f.name
+
+            # Remove county prefix + underscore if present
+            prefix = county_name + "_"
+
+            if file_name.startswith(prefix):
+                file_name = file_name[len(prefix):]
+            group_files_only[group].add(file_name)
+
+# --- Output ---
+
+print("="*60)
+print("COUNTY-LEVEL METRICS IN MARYLAND")
+print("="*60)
+
+#print("County-Level Metrics List:")
+#print(county_metric_list)
+
+print("County-Level Metrics DataFrame (grouped):")
+print(county_metrics_df)
+
+
+# Print file names sorted by metric group
+# Note VERY long, to avoid Terminal view clutter, keep commented out
+for group, files in group_files_only.items():
+    print(f"\nGroup: {group}")
+    for f in sorted(files):
+        print(f"  {f}")
 
 # ----------------------------------------------- #
 # Create set to store unique STATE-LEVEL metrics #
@@ -347,6 +368,11 @@ def get_group_data_for_county(county_name_pretty: str, group_name: str) -> pd.Da
         raise ValueError(f"No {group_name} metrics found for county: {county_name_pretty}")
 
     return pd.concat(frames, ignore_index=True)
+
+
+##############################################################
+
+
 
 """
 
