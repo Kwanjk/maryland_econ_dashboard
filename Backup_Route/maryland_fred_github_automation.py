@@ -573,6 +573,39 @@ def main():
 
     print(f"\n⏱️ Runtime: {time.time() - start_time:.2f} seconds")
 
+# ----------------------------------------------
+# OPTIONAL: Export master dataset as .hyper file
+# ----------------------------------------------
+try:
+    from tableauhyperapi import HyperProcess, Connection, TableDefinition, SqlType, Telemetry, Inserter
+
+    hyper_path = os.path.join(MASTER_EXPORT_PATH, "maryland_master.hyper")
+    print(f"\n⚙️ Creating Tableau .hyper extract at: {hyper_path}")
+
+    # Start Hyper process
+    with HyperProcess(Telemetry.SEND_USAGE_DATA_TO_TABLEAU) as hyper:
+        with Connection(endpoint=hyper.endpoint, database=hyper_path, create_mode=True) as connection:
+
+            # Build table schema dynamically
+            cols = [
+                TableDefinition.Column(name, SqlType.text()) 
+                for name in master_df.columns
+            ]
+            table = TableDefinition("Extract", "Extract", cols)
+
+            connection.catalog.create_schema("Extract")
+            connection.catalog.create_table(table)
+
+            # Insert rows
+            with Inserter(connection, table) as inserter:
+                for _, row in master_df.iterrows():
+                    inserter.add_row(list(row.values))
+                inserter.execute()
+
+    print(f"✅ Tableau .hyper file generated: {hyper_path}")
+
+except ImportError:
+    print("ℹ️ tableauhyperapi not installed — skipping .hyper export.")
 
 # ======================================================
 # ENTRY POINT
