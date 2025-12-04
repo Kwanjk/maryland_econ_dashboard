@@ -42,15 +42,18 @@ from plotly.subplots import make_subplots
 # Ensure Current Working Directory is correct #
 # ------------------------------------------- #
 
-print("Current Working Directory:", os.getcwd())
+
+print("\nCurrent Working Directory:\n", os.getcwd(), "\n")
 
 # Base directories
 state_base_dir = Path("fred_csv_outputs/state_data")
 county_base_dir = Path("fred_csv_outputs/county_data")
 
-# Test existence
+"""
+# Test existence of state and county directories
 print("State-Level:", state_base_dir.exists(), state_base_dir.is_dir())
 print("County-Level:", county_base_dir.exists(), county_base_dir.is_dir())
+"""
 
 # ------------------------------- #
 # Helper Function for File Naming #
@@ -100,11 +103,16 @@ county_list = county_series_id_df["COUNTY"].unique().tolist()
 # Convert to snake_case using the function
 county_list_snake = [to_snake_case(c) for c in county_list]
 
+print("="*60)
+print("ALL COUNTIES IN MARYLAND")
+print("="*60)
+
 print("Original counties:")
 print(county_list)
-print("-"*60)
-print("Snake-case counties:")
-print(county_list_snake)
+
+#print("-"*60)
+#print("Snake-case counties:")
+#print(county_list_snake)
 
 # ----------------------------------------------- #
 # Create set to store unique COUNTY-LEVEL metrics #
@@ -157,13 +165,59 @@ for group, metrics in grouped_county_metrics.items():
 county_metrics_df = pd.DataFrame(rows)
 
 # --- Output ---
-print("Metrics List:")
-print(county_metric_list)
 
-print("-"*60)
+print("="*60)
+print("COUNTY-LEVEL METRICS IN MARYLAND")
+print("="*60)
 
-print("Metrics DataFrame (grouped):")
+#print("County-Level Metrics List:")
+#print(county_metric_list)
+
+print("County-Level Metrics DataFrame (grouped):")
 print(county_metrics_df)
+
+# ----------------------------------------------- #
+# Dictionary to store COUNTY-LEVEL files by group #
+# ----------------------------------------------- #
+
+# Initialize nested dictionary
+county_group_file_dict = {}
+
+# Loop through all counties in county_list_snake
+for county in county_list_snake:
+    county_dir = county_base_dir / county
+    if not county_dir.exists():
+        continue  # skip if folder doesn't exist
+
+    # Filter metrics by group
+    for group in ["housing", "labor", "economy"]:
+        # Get metrics in this group
+        metrics_in_group = county_metrics_df[county_metrics_df['group'] == group]['metric'].tolist()
+        
+        # Find all CSVs in the county folder that match metrics in this group
+        matching_files = []
+        for file in county_dir.rglob("*.csv"):
+            file_name = file.stem.lower()
+            # Remove county prefix if present
+            prefix = county + "_"
+            if file_name.startswith(prefix):
+                metric_name = file_name[len(prefix):]
+            else:
+                metric_name = file_name
+            if any(metric.lower() == metric_name for metric in metrics_in_group):
+                matching_files.append(file)
+        
+        # Add to nested dictionary
+        county_group_file_dict.setdefault(county, {})[group] = matching_files
+
+
+# --- Example output ---
+for county, groups in county_group_file_dict.items():
+    print(f"\nCounty: {county}")
+    for group, files in groups.items():
+        print(f"  Group: {group}")
+        for f in files:
+            print(f"    {f}")
 
 # ----------------------------------------------- #
 # Create set to store unique STATE-LEVEL metrics #
@@ -208,15 +262,20 @@ for group, metrics in grouped_state_metrics.items():
 state_metrics_df = pd.DataFrame(rows)
 
 # --- Output ---
-print("State Metrics List:")
-print(state_metric_list)
 
-print("-"*60)
+print("="*60)
+print("STATE-LEVEL METRICS FOR MARYLAND")
+print("="*60)
 
-print("State Metrics DataFrame (grouped):")
+#print("State-Level Metrics List:")
+#print(state_metric_list)
+
+print("State-Level Metrics DataFrame (grouped):")
 print(state_metrics_df)
 
+# ----------------------------------------------- #
 # Dictionary to store STATE-LEVEL files by group
+# ----------------------------------------------- #
 
 state_group_file_dict = {}
 
@@ -239,48 +298,6 @@ for group, files in state_group_file_dict.items():
     print(f"\nGroup: {group}")
     for f in files:
         print(f)
-
-# ----------------------------------------------- #
-# Dictionary to store COUNTY-LEVEL files by group #
-# ----------------------------------------------- #
-
-# Initialize nested dictionary
-county_group_file_dict = {}
-
-# Loop through all counties in county_list_snake
-for county in county_list_snake:
-    county_dir = county_base_dir / county
-    if not county_dir.exists():
-        continue  # skip if folder doesn't exist
-
-    # Filter metrics by group
-    for group in ["housing", "labor", "economy"]:
-        # Get metrics in this group
-        metrics_in_group = county_metrics_df[county_metrics_df['group'] == group]['metric'].tolist()
-        
-        # Find all CSVs in the county folder that match metrics in this group
-        matching_files = []
-        for file in county_dir.rglob("*.csv"):
-            file_name = file.stem.lower()
-            # Remove county prefix if present
-            prefix = county + "_"
-            if file_name.startswith(prefix):
-                metric_name = file_name[len(prefix):]
-            else:
-                metric_name = file_name
-            if any(metric.lower() == metric_name for metric in metrics_in_group):
-                matching_files.append(file)
-        
-        # Add to nested dictionary
-        county_group_file_dict.setdefault(county, {})[group] = matching_files
-
-# --- Example output ---
-for county, groups in county_group_file_dict.items():
-    print(f"\nCounty: {county}")
-    for group, files in groups.items():
-        print(f"  Group: {group}")
-        for f in files:
-            print(f"    {f}")
 
 ##############################################################
 
@@ -331,6 +348,10 @@ def get_group_data_for_county(county_name_pretty: str, group_name: str) -> pd.Da
 
     return pd.concat(frames, ignore_index=True)
 
+"""
+
+TODO Not sure if this is necessary
+
 # ---------------------------------------------------------- #
 # Dash callback already works with friendly labels
 # ---------------------------------------------------------- #
@@ -344,6 +365,9 @@ def update_metrics_graph(county_name_pretty, group_name):
     df = get_group_data_for_county(county_name_pretty, group_name)
     fig = create_group_figure(df, county_name_pretty)
     return fig
+
+
+
 
 
 ##############################################################
@@ -555,3 +579,5 @@ def show_housing(county):
 # ------------ GRAPHING SPECIFIC GRAPHS ------------ #
 # ------ LABOR Metrics for Maryland Counties ------- #
 ######################################################
+
+"""
