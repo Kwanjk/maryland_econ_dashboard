@@ -18,34 +18,42 @@
 
 # -----------------------------------------------------
 
-import pandas as pd  # Data cleaning
-from fredapi import Fred  # Accessing data
-import os  # File management (reading and saving)
-import yaml  # Load API key from a YAML file for security purposes
-import re  # For file naming manipulation
-import time  # To buffer API requests
-from urllib.error import HTTPError  # Handle API request limit
-from dash import Dash, html, dcc, callback, Output, Input  # To make interactive dashboards
-import plotly.express as px  # To make interactive graphs
+# ---------------------------------------- #
+# Import Libraries for Data & File Handling
+# ---------------------------------------- #
+import os
+import re
+from pathlib import Path
+from urllib.error import HTTPError
+
+import pandas as pd
+from fredapi import Fred
+import yaml
+
+# ---------------------------------------- #
+# Import Libraries for Dash & Visualization
+# ---------------------------------------- #
+from dash import Dash, html, dcc, callback
+from dash.dependencies import Input, Output
+import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from ipywidgets import interact, Dropdown
-
-from pathlib import Path  # To search through files/documents
 
 # ------------------------------------------- #
 # Ensure Current Working Directory is correct #
 # ------------------------------------------- #
 
-print("Current Working Directory:", os.getcwd())
+#print("\nCurrent Working Directory:\n", os.getcwd(), "\n")
 
 # Base directories
 state_base_dir = Path("fred_csv_outputs/state_data")
 county_base_dir = Path("fred_csv_outputs/county_data")
 
-# Test existence
+"""
+# Test existence of state and county directories
 print("State-Level:", state_base_dir.exists(), state_base_dir.is_dir())
 print("County-Level:", county_base_dir.exists(), county_base_dir.is_dir())
+"""
 
 # ------------------------------- #
 # Helper Function for File Naming #
@@ -95,11 +103,20 @@ county_list = county_series_id_df["COUNTY"].unique().tolist()
 # Convert to snake_case using the function
 county_list_snake = [to_snake_case(c) for c in county_list]
 
-print("Original counties:")
-print(county_list)
-print("-"*60)
-print("Snake-case counties:")
-print(county_list_snake)
+"""
+# Keep uncommented to reduce visual clutter in Terminal view when running
+print("="*60)
+print("ALL COUNTIES IN MARYLAND")
+print("="*60)
+
+#print("Original counties:")
+for county in county_list:
+    print(county)
+
+#print("-"*60)
+#print("Snake-case counties:")
+#print(county_list_snake)
+"""
 
 # ----------------------------------------------- #
 # Create set to store unique COUNTY-LEVEL metrics #
@@ -138,7 +155,7 @@ group_county_patterns = {
 grouped_county_metrics = {group: [] for group in group_county_patterns.keys()}
 
 for metric in county_metric_list:
-    for group, pattern in group_county_patterns.items():  # corrected
+    for group, pattern in group_county_patterns.items():
         if pattern.search(metric):
             grouped_county_metrics[group].append(metric)
             break
@@ -151,14 +168,76 @@ for group, metrics in grouped_county_metrics.items():
 
 county_metrics_df = pd.DataFrame(rows)
 
+# ----------------------------------------------- #
+# Dictionary to store COUNTY-LEVEL files by group #
+# ----------------------------------------------- #
+
+# Initialize nested dictionary
+county_group_file_dict = {}
+
+# Loop through all counties in county_list_snake
+for county in county_list_snake:
+    county_dir = county_base_dir / county
+    if not county_dir.exists():
+        continue  # skip if folder doesn't exist
+
+    # Filter metrics by group
+    for group in ["housing", "labor", "economy"]:
+        # Get metrics in this group
+        metrics_in_group = county_metrics_df[county_metrics_df['group'] == group]['metric'].tolist()
+        
+        # Find all CSVs in the county folder that match metrics in this group
+        matching_files = []
+        for file in county_dir.rglob("*.csv"):
+            file_name = file.stem.lower()
+            # Remove county prefix if present
+            prefix = county + "_"
+            if file_name.startswith(prefix):
+                metric_name = file_name[len(prefix):]
+            else:
+                metric_name = file_name
+            if any(metric.lower() == metric_name for metric in metrics_in_group):
+                matching_files.append(file)
+        
+        # Add to nested dictionary
+        county_group_file_dict.setdefault(county, {})[group] = matching_files
+
+# ----------------------------------------------- #
+# Display Output: Just Group and Files (no County)
+# ----------------------------------------------- #
+
+# Collect unique files for each group across all counties
+group_files_only = {group: set() for group in ["housing", "labor", "economy"]}
+
+for county_name, county_groups in county_group_file_dict.items():
+    for group, files in county_groups.items():
+        for f in files:
+            file_name = f.name
+
+            # Remove county prefix + underscore if present
+            prefix = county_name + "_"
+
+            if file_name.startswith(prefix):
+                file_name = file_name[len(prefix):]
+            group_files_only[group].add(file_name)
+
 # --- Output ---
-print("Metrics List:")
-print(county_metric_list)
 
-print("-"*60)
+print("="*60)
+print("COUNTY-LEVEL METRICS IN MARYLAND")
+print("="*60)
 
-print("Metrics DataFrame (grouped):")
+#print("County-Level Metrics List:")
+#print(county_metric_list)
+
+print("County-Level Metrics DataFrame (grouped):")
 print(county_metrics_df)
+
+# Print file names sorted by metric group
+for group, files in group_files_only.items():
+    print(f"\nGroup: {group}")
+    for f in sorted(files):
+        print(f"  {f}")
 
 # ----------------------------------------------- #
 # Create set to store unique STATE-LEVEL metrics #
@@ -203,15 +282,20 @@ for group, metrics in grouped_state_metrics.items():
 state_metrics_df = pd.DataFrame(rows)
 
 # --- Output ---
-print("State Metrics List:")
-print(state_metric_list)
 
-print("-"*60)
+print("="*60)
+print("STATE-LEVEL METRICS FOR MARYLAND")
+print("="*60)
 
-print("State Metrics DataFrame (grouped):")
+#print("State-Level Metrics List:")
+#print(state_metric_list)
+
+print("State-Level Metrics DataFrame (grouped):")
 print(state_metrics_df)
 
+# ----------------------------------------------- #
 # Dictionary to store STATE-LEVEL files by group
+# ----------------------------------------------- #
 
 state_group_file_dict = {}
 
@@ -235,51 +319,380 @@ for group, files in state_group_file_dict.items():
     for f in files:
         print(f)
 
-
-# Dictionary to store COUNTY-LEVEL files by group
-
-# Initialize nested dictionary
-county_group_file_dict = {}
-
-# Loop through all counties in county_list_snake
-for county in county_list_snake:
-    county_dir = county_base_dir / county
-    if not county_dir.exists():
-        continue  # skip if folder doesn't exist
-
-    # Filter metrics by group
-    for group in ["housing", "labor", "economy"]:
-        # Get metrics in this group
-        metrics_in_group = county_metrics_df[county_metrics_df['group'] == group]['metric'].tolist()
-        
-        # Find all CSVs in the county folder that match metrics in this group
-        matching_files = []
-        for file in county_dir.rglob("*.csv"):
-            file_name = file.stem.lower()
-            # Remove county prefix if present
-            prefix = county + "_"
-            if file_name.startswith(prefix):
-                metric_name = file_name[len(prefix):]
-            else:
-                metric_name = file_name
-            if any(metric.lower() == metric_name for metric in metrics_in_group):
-                matching_files.append(file)
-        
-        # Add to nested dictionary
-        county_group_file_dict.setdefault(county, {})[group] = matching_files
-
-# --- Example output ---
-for county, groups in county_group_file_dict.items():
-    print(f"\nCounty: {county}")
-    for group, files in groups.items():
-        print(f"  Group: {group}")
-        for f in files:
-            print(f"    {f}")
-
-
-# ---------------------------------------------------------- #
 ##############################################################
+
+# ------------------------------------------------------- #
+# Create a mapping for aesthetic "friendly" metric labels #
+# ------------------------------------------------------- #
+
+def make_friendly_label(metric_name: str) -> str:
+    """
+    Convert raw metric name to a readable friendly label.
+    Example: 'all_transaction_house_price_index' -> 'All Transaction House Price Index'
+    """
+    # Replace underscores with spaces, capitalize words
+    return metric_name.replace("_", " ").title()
+
+# Create dictionary dynamically from county_metrics_df
+metric_label_dict = {m: make_friendly_label(m) for m in county_metrics_df["metric"].unique()}
+
+# ----------------------------------- #
+# Get Metrics Data for County + Group #
+# ----------------------------------- #
+
+def get_group_data_for_county(county_name_pretty: str, group_name: str) -> pd.DataFrame:
+    county_snake = to_snake_case(county_name_pretty)
+    county_folder = county_base_dir / county_snake
+
+    if not county_folder.exists():
+        raise FileNotFoundError(f"No folder found for county: {county_folder}")
+
+    metrics_in_group = county_metrics_df[county_metrics_df['group'] == group_name]['metric'].tolist()
+    frames = []
+
+    for metric in metrics_in_group:
+        csv_path = county_folder / f"{county_snake}_{metric}.csv"
+        if not csv_path.exists():
+            continue
+
+        df = pd.read_csv(csv_path)
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"])
+
+        # Use friendly label for hover
+        df["metric"] = metric_label_dict.get(metric, metric)
+        frames.append(df)
+
+    if not frames:
+        raise ValueError(f"No {group_name} metrics found for county: {county_name_pretty}")
+
+    return pd.concat(frames, ignore_index=True)
+
+##############################################################
+
+# ------------------------------------ #
+# Create, View, and Save Plotly Graphs #
+# ------------------------------------ #
+
+# Define your output directory
+plotly_outputs_dir = Path("plotly_outputs")
+plotly_outputs_dir.mkdir(parents=True, exist_ok=True)  # create if doesn't exist
+
+def create_group_figure(df, county_name, group_name):
+    """
+    Create a Plotly figure for all metrics in a group for a given county.
+
+    Parameters:
+    - df: DataFrame containing 'date', 'value', and 'metric' columns
+    - county_name: Friendly county name for the figure title
+    - group_name: Metric group name for the figure title
+
+    Returns:
+    - Plotly Figure object
+    """
+    metrics = sorted(df["metric"].unique())
+    n_rows = len(metrics)
+
+    fig = make_subplots(
+        rows=n_rows, cols=1, shared_xaxes=True,
+        subplot_titles=metrics, vertical_spacing=0.06
+    )
+
+    for i, m in enumerate(metrics, start=1):
+        df_m = df[df["metric"] == m]
+        fig.add_trace(
+            go.Scatter(
+                x=df_m["date"],
+                y=df_m["value"],
+                mode="lines+markers",
+                name=m,
+                showlegend=False,
+                marker=dict(size=6),
+                hovertemplate="<b>%{fullData.name}</b><br>Date: %{x|%Y-%m-%d}<br>Value: %{y:.2f}<extra></extra>"
+            ),
+            row=i, col=1
+        )
+        fig.update_yaxes(title_text="Value", row=i, col=1)
+
+    fig.update_xaxes(title_text="Date", row=n_rows, col=1)
+    fig.update_layout(
+        height=250*n_rows,
+        title_text=f"{county_name} – {group_name.title()} Metrics Over Time"
+    )
+    return fig
+
+def show_county_group_graph(county_name_pretty: str, group_name: str, save_html: bool = False, html_path: str = None):
+    """
+    Quickly display a Plotly graph for a given county and metric group
+    without running the full Dash app.
+
+    Parameters:
+    - county_name_pretty: Friendly county name (e.g., "Allegany")
+    - group_name: Metric group name (e.g., "housing")
+    - save_html: Whether to save the figure as an HTML file
+    - html_path: File path to save HTML. If None, will default to '<plotly_outputs_dir>/<county>_<group>.html'
+    """
+    df = get_group_data_for_county(county_name_pretty, group_name)
+    fig = create_group_figure(df, county_name_pretty, group_name)
+    
+    if save_html:
+        if html_path is None:
+            html_path = plotly_outputs_dir / f"{to_snake_case(county_name_pretty)}_{group_name}.html"
+        fig.write_html(html_path)
+        print(f"Saved Plotly figure to: {html_path}")
+
+    fig.show()
+
+
+# --------------------- #
+# Running Plotly Script #
+# --------------------- #
+
+# Example: Display and save Allegany county housing metrics
+county_name = "Allegany"
+group_name = "housing"
+
+show_county_group_graph(county_name, group_name, save_html=True)
+
+# Print a confirmation message
+print(f"[INFO] Plotly graph for {county_name} ({group_name}) has been displayed and saved in '{plotly_outputs_dir}'")
+
+
+"""
+##############################################################
+
+# ---------------------- #
+# Create Plotly Dash App #
+# ---------------------- #
+
+# Initialize app
+app = Dash(__name__)
+
+# Dynamic dropdown options
+county_options = sorted(county_list)  # From Excel (pretty names)
+group_options = sorted(county_metrics_df["group"].unique())  # From grouped metrics
+
+# App layout
+app.layout = html.Div([
+    html.H2("Maryland County Metrics"),
+    
+    html.Div([
+        html.Label("Select County:"),
+        dcc.Dropdown(
+            id="county_dropdown",
+            options=[{"label": c, "value": c} for c in county_options],
+            value=county_options[0],
+            clearable=False,
+            style={"width": "300px"}
+        ),
+    ], style={"margin-bottom": "20px"}),
+    
+    html.Div([
+        html.Label("Select Metric Group:"),
+        dcc.Dropdown(
+            id="group_dropdown",
+            options=[{"label": g.title(), "value": g} for g in group_options],
+            value=group_options[0],
+            clearable=False,
+            style={"width": "300px"}
+        ),
+    ], style={"margin-bottom": "20px"}),
+    
+    dcc.Graph(id="metrics_graph")
+])
+
+# ------------------------- #
+# Function to create figure #
+# ------------------------- #
+
+def create_group_figure(df, county_name, group_name):
+    metrics = sorted(df["metric"].unique())
+    n_rows = len(metrics)
+
+    fig = make_subplots(
+        rows=n_rows, cols=1,
+        shared_xaxes=True,
+        subplot_titles=metrics,
+        vertical_spacing=0.06
+    )
+
+    for i, m in enumerate(metrics, start=1):
+        df_m = df[df["metric"] == m]
+        fig.add_trace(
+            go.Scatter(
+                x=df_m["date"],
+                y=df_m["value"],
+                mode="lines+markers",
+                name=m,
+                showlegend=False,
+                marker=dict(size=6),
+                hovertemplate="<b>%{fullData.name}</b><br>Date: %{x|%Y-%m-%d}<br>Value: %{y:.2f}<extra></extra>"
+            ),
+            row=i, col=1
+        )
+        fig.update_yaxes(title_text="Value", row=i, col=1)
+
+    fig.update_xaxes(title_text="Date", row=n_rows, col=1)
+    fig.update_layout(
+        height=250*n_rows,
+        title_text=f"{county_name} – {group_name.title()} Metrics Over Time"
+    )
+    return fig
+
+# --------------------------------------- #
+# Single callback with "No Data" Handling #
+# --------------------------------------- #
+
+@app.callback(
+    Output("metrics_graph", "figure"),
+    Input("county_dropdown", "value"),
+    Input("group_dropdown", "value")
+)
+
+def update_metrics_graph(county_name_pretty, group_name):
+    try:
+        # Fetch data dynamically
+        df = get_group_data_for_county(county_name_pretty, group_name)
+    except (FileNotFoundError, ValueError):
+        # If no data is found, return a simple figure with message
+        fig = go.Figure()
+        fig.add_annotation(
+            x=0.5, y=0.5,
+            text=f"No {group_name.title()} data available for {county_name_pretty}.",
+            showarrow=False,
+            font=dict(size=16),
+            xref="paper",
+            yref="paper"
+        )
+        fig.update_layout(
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            title=f"{county_name_pretty} – {group_name.title()} Metrics Over Time",
+            height=300
+        )
+        return fig
+
+    # Otherwise, return the usual figure
+    return create_group_figure(df, county_name_pretty, group_name)
+
+# ------- #
+# Run app #
+# ------- #
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+
+##############################################################
+
+
+TODO Not sure if this is necessary
+
 # ---------------------------------------------------------- #
+# Dash callback already works with friendly labels
+# ---------------------------------------------------------- #
+
+@callback(
+    Output("metrics_graph", "figure"),
+    Input("county_dropdown", "value"),
+    Input("group_dropdown", "value")
+)
+def update_metrics_graph(county_name_pretty, group_name):
+    df = get_group_data_for_county(county_name_pretty, group_name)
+    fig = create_group_figure(df, county_name_pretty)
+    return fig
+
+
+
+##############################################################
+
+# ---------------------------------------- #
+# Create Dash App
+# ---------------------------------------- #
+app = Dash(__name__)
+
+# Dynamic dropdown options
+county_options = sorted(county_list)  # Pretty names from Excel
+group_options = sorted(county_metrics_df["group"].unique())  # All groups dynamically
+
+app.layout = html.Div([
+    html.H2("Maryland County Metrics"),
+    html.Div([
+        html.Label("Select County:"),
+        dcc.Dropdown(
+            id="county_dropdown",
+            options=[{"label": c, "value": c} for c in county_options],
+            value=county_options[0],
+            clearable=False,
+            style={"width": "300px"}
+        ),
+    ]),
+    html.Div([
+        html.Label("Select Metric Group:"),
+        dcc.Dropdown(
+            id="group_dropdown",
+            options=[{"label": g.title(), "value": g} for g in group_options],
+            value=group_options[0],
+            clearable=False,
+            style={"width": "300px"}
+        ),
+    ]),
+    dcc.Graph(id="metrics_graph")
+])
+
+# ---------------------------------------- #
+# Function to create Plotly figure
+# ---------------------------------------- #
+def create_group_figure(df, county_name, group_name):
+    metrics = sorted(df["metric"].unique())
+    n_rows = len(metrics)
+
+    fig = make_subplots(
+        rows=n_rows, cols=1, shared_xaxes=True,
+        subplot_titles=metrics, vertical_spacing=0.06
+    )
+
+    for i, m in enumerate(metrics, start=1):
+        df_m = df[df["metric"] == m]
+        fig.add_trace(
+            go.Scatter(
+                x=df_m["date"],
+                y=df_m["value"],
+                mode="lines+markers",
+                name=m,
+                showlegend=False,
+                marker=dict(size=6),
+                hovertemplate="<b>%{fullData.name}</b><br>Date: %{x|%Y-%m-%d}<br>Value: %{y:.2f}<extra></extra>"
+            ),
+            row=i, col=1
+        )
+        fig.update_yaxes(title_text="Value", row=i, col=1)
+
+    fig.update_xaxes(title_text="Date", row=n_rows, col=1)
+    fig.update_layout(
+        height=250*n_rows,
+        title_text=f"{county_name} – {group_name.title()} Metrics Over Time"
+    )
+    return fig
+
+# ---------------------------------------- #
+# Callback to update figure based on dropdown
+# ---------------------------------------- #
+@app.callback(
+    Output("metrics_graph", "figure"),
+    Input("county_dropdown", "value"),
+    Input("group_dropdown", "value")
+)
+def update_metrics_graph(county_name_pretty, group_name):
+    # Dynamically fetch metrics for selected county and group
+    df = get_group_data_for_county(county_name_pretty, group_name)
+    return create_group_figure(df, county_name_pretty, group_name)
+
+# ---------------------------------------- #
+# Run app
+# ---------------------------------------- #
+if __name__ == "__main__":
+    app.run_server(debug=True)
 
 
 ######################################################
@@ -399,3 +812,5 @@ def show_housing(county):
 # ------------ GRAPHING SPECIFIC GRAPHS ------------ #
 # ------ LABOR Metrics for Maryland Counties ------- #
 ######################################################
+
+"""
