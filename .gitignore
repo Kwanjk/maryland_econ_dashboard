@@ -30,3 +30,8 @@ Thumbs.db
 .venv/
 venv/
 .envrc
+
+# --- Data Files ---
+bls_csv_outputs
+fred_csv_outputs
+plotly_outputs
