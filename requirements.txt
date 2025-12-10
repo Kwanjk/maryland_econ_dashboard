@@ -10,6 +10,7 @@ fredapi==0.5.2
 idna==3.11
 importlib_metadata==8.7.0
 itsdangerous==2.2.0
+ipumspy  
 Jinja2==3.1.6
 MarkupSafe==3.0.3
 narwhals==2.13.0
