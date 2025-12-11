@@ -8,7 +8,7 @@ _University of Maryland, College Park_
 ## Description
 In collaboration with the National Center for Smart Growth Research and Education (NCSG) at the University of Maryland, College Park, this project produces CSV outputs and visualizations of economic indicators for Maryland counties and the state.  
 
-We pull data from two sources:
+We pull data from three sources:
 * **FRED** — population, housing, GDP, and other economic indicators (`fred_api.py`).
 * **BLS** — employment, unemployment rate, unemployment count, and labor force metrics (`bls_api.py`).
 * **Socrata (Maryland Open Data)** — foreclosure filings data by county (`socrata_api.py`).
@@ -21,7 +21,7 @@ The scripts handle:
 ---
 
 ## Output
-Running the API scripts creates CSVs with `date` and `value` columns:
+Running the API scripts creates CSV files organized by source:
 
 * **FRED outputs**
     - County: `fred_csv_outputs/county_data/{county}/{county}_{series}.csv`
@@ -86,16 +86,15 @@ bls_csv_outputs/
         ├── allegany_all_metrics.csv
         └── ...
 
-    maryland_foreclosure_data/
-    ├── ALLEGANY.csv
-    ├── ANNE_ARUNDEL.csv
-    └── ...
+maryland_foreclosure_data/
+├── ALLEGANY.csv
+├── ANNE_ARUNDEL.csv
+└── ...
 ```
 
-
-    Each CSV contains:
-    * FRED/BLS: `date` – observation date; `value` – observed value for the series
-    * Socrata: `OBSERVATION DATE` plus foreclosure metrics columns (e.g., `NOI`, `NOF`, `FPR`) per county
+Each CSV contains:
+* FRED/BLS: `date` – observation date; `value` – observed value for the series
+* Socrata: `OBSERVATION DATE` plus foreclosure metrics columns (e.g., `NOI`, `NOF`, `FPR`) per county
 
 ## Required Dependencies
 This project requires the following Python libraries:
