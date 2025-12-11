@@ -124,4 +124,4 @@ This project requires the following Python libraries:
 * Add logging for API errors, retries, and skipped series.
 * Handle partial data fetch resumption automatically if interrupted.
 * Incorporate automated scheduling to update data regularly.
-* Finish the alternative GitHub automation path in `Backup_Route/` (see `maryland_fred_github_automation.py` and `workflows/github_automation_refresh.yml`) to refresh data via CI instead of manual runs.
+* Finish the alternative GitHub automation path in `Backup_Route/` (see `maryland_fred_github_automation.py` and `workflows/github_automation_refresh.yml`) to refresh data via continuous integration (CI) instead of manual runs.
