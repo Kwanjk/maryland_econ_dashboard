@@ -11,6 +11,7 @@ In collaboration with the National Center for Smart Growth Research and Educatio
 We pull data from two sources:
 * **FRED** — population, housing, GDP, and other economic indicators (`fred_api.py`).
 * **BLS** — employment, unemployment rate, unemployment count, and labor force metrics (`bls_api.py`).
+* **Socrata (Maryland Open Data)** — foreclosure filings data by county (`socrata_api.py`).
 
 The scripts handle:
 * Retrieving series metadata (title, source, frequency, observation start/end)
@@ -28,6 +29,8 @@ Running the API scripts creates CSVs with `date` and `value` columns:
 * **BLS outputs**
     - Per-series county files: `bls_csv_outputs/county_data/separate/{county}_{metric}.csv`
     - Merged county files: `bls_csv_outputs/county_data/merged/{county}_all_metrics.csv`
+* **Socrata outputs**
+    - Per-county foreclosure metrics pivoted by type (e.g., NOI/NOF/FPR): `maryland_foreclosure_data/{COUNTY}.csv`
 
 ---
 
@@ -50,7 +53,11 @@ python fred_api.py
 ```bash
 python bls_api.py
 ```
-6. (Optional) Explore dashboards/plots with `generate_plotly_dash.py` once FRED outputs exist. The script expects data in `fred_csv_outputs/state_data` and `fred_csv_outputs/county_data`.
+6. Fetch Socrata foreclosure data (Maryland Open Data):
+```bash
+python socrata_api.py
+```
+7. (Optional) Explore dashboards/plots with `generate_plotly_dash.py` once FRED outputs exist. The script expects data in `fred_csv_outputs/state_data` and `fred_csv_outputs/county_data`.
 
 ---
 
@@ -78,12 +85,17 @@ bls_csv_outputs/
     └── merged/
         ├── allegany_all_metrics.csv
         └── ...
+
+    maryland_foreclosure_data/
+    ├── ALLEGANY.csv
+    ├── ANNE_ARUNDEL.csv
+    └── ...
 ```
 
 
-Each CSV contains:
-* `date` – observation date
-* `value` – observed value for the series
+    Each CSV contains:
+    * FRED/BLS: `date` – observation date; `value` – observed value for the series
+    * Socrata: `OBSERVATION DATE` plus foreclosure metrics columns (e.g., `NOI`, `NOF`, `FPR`) per county
 
 ## Required Dependencies
 This project requires the following Python libraries:
