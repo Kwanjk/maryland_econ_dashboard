@@ -25,29 +25,16 @@ os.makedirs(raw_download_folder, exist_ok=True)
 
 # --- CLEANUP: Wipe OLD files (Outputs AND Raw Zips) ---
 print(f"[INFO] Cleaning up old files...")
-
-# 1. Clean Output Folder
-for filename in os.listdir(md_demog_output_folder):
-    file_path = os.path.join(md_demog_output_folder, filename)
-    try:
-        if os.path.isfile(file_path) or os.path.islink(file_path):
-            os.unlink(file_path)
-        elif os.path.isdir(file_path):
-            shutil.rmtree(file_path)
-    except Exception as e:
-        print(f"Failed to delete {file_path}. Reason: {e}")
-
-# 2. Clean Raw Zips Folder (NEW)
-for filename in os.listdir(raw_download_folder):
-    file_path = os.path.join(raw_download_folder, filename)
-    try:
-        if os.path.isfile(file_path) or os.path.islink(file_path):
-            os.unlink(file_path)
-        elif os.path.isdir(file_path):
-            shutil.rmtree(file_path)
-    except Exception as e:
-        print(f"Failed to delete {file_path}. Reason: {e}")
-
+for folder in [md_demog_output_folder, raw_download_folder]:
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print(f"Failed to delete {file_path}. Reason: {e}")
 print(f"[INFO] Folders wiped clean.")
 
 # Load API Keys
@@ -65,21 +52,17 @@ headers = {
 # ------------------------- #
 file_path = "Indicators Series ID List.xlsx"
 state_sheet = "MD IPUMS NHGIS"
-# Ensure the Excel file exists
 if not os.path.exists(file_path):
     print(f"[ERROR] Could not find {file_path}")
     exit()
 
 series_id_df = pd.read_excel(file_path, sheet_name=state_sheet, skiprows=1)
-
-# Extract IDs (Assuming row 0 contains the relevant IDs after the first column)
 id_list = series_id_df.iloc[0].dropna().astype(str).tolist()[1:]
 
 # ------------------------- #
 # 2. Parse IDs              #
 # ------------------------- #
 def split_id(x):
-    """Parse NHGIS-style ID into name, specifier, year"""
     name = x[:3]       # e.g., A00
     specifier = x[3:5] # e.g., AA
     year = x[-4:]      # e.g., 1920
@@ -93,12 +76,10 @@ parsed_df["year"] = parsed_df["year"].astype(int)
 # 3. Build & Submit Extract #
 # ------------------------- #
 time_series_tables = defaultdict(lambda: {"years": set(), "geogLevels": ["state"]})
-# NOTE: If you need county-level data, change ["state"] to ["county"] above.
-
+# NOTE: If you need county-level data, change ["state"] to ["county"] below
 for _, row in parsed_df.iterrows():
     time_series_tables[row["name"]]["years"].add(str(row["year"]))
 
-# Convert sets to lists for JSON
 time_series_tables = {
     table: {"years": sorted(list(values["years"])), "geogLevels": values["geogLevels"]}
     for table, values in time_series_tables.items()
@@ -107,7 +88,7 @@ time_series_tables = {
 extract_payload = {
     "timeSeriesTables": time_series_tables,
     "description": "Maryland NHGIS extract: INST490",
-    "dataFormat": "csv_header", # Important: Retains double headers
+    "dataFormat": "csv_header",
     "breakdownAndDataTypeLayout": "single_file",
     "timeSeriesTableLayout": "time_by_row_layout"
 }
@@ -127,13 +108,11 @@ print(f"[INFO] Extract #{extract_number} submitted. Waiting for processing...")
 # ------------------------- #
 # 4. Wait & Download Logic  #
 # ------------------------- #
-# Direct status URL for this specific extract
 status_url = f"https://api.ipums.org/extracts/{extract_number}?collection=nhgis&version=2"
 
 while True:
     resp = requests.get(status_url, headers=headers)
     extract_info = resp.json()
-    
     status = extract_info.get("status")
     
     if status == "completed":
@@ -141,25 +120,22 @@ while True:
         break
     elif status == "failed":
         print("[ERROR] Extract generation failed.")
-        print(extract_info.get("detail", "No detail provided."))
         exit()
     else:
         print(f"Status: {status}. Retrying in 30s...")
         time.sleep(30)
 
-# Download URL
-if "downloadLinks" in extract_info and "tableData" in extract_info["downloadLinks"]:
+if "downloadLinks" in extract_info:
     download_url = extract_info["downloadLinks"]["tableData"]["url"]
     r = requests.get(download_url, headers=headers)
     zip_path = os.path.join(raw_download_folder, f"nhgis{extract_number:04d}.zip")
-
     with open(zip_path, "wb") as f:
         f.write(r.content)
 else:
     print("[ERROR] Download link not found.")
     exit()
 
-# Extract the CSV from the ZIP
+# Extract CSV
 target_csv_name = ""
 with zipfile.ZipFile(zip_path, 'r') as z:
     for filename in z.namelist():
@@ -174,27 +150,33 @@ with zipfile.ZipFile(zip_path, 'r') as z:
 print("-" * 50)
 print("[INFO] Starting Data Cleaning...")
 
-# --- Filename Mapping Dictionary ---
+# --- VERIFIED FILENAME MAP (From Excel) ---
 filename_map = {
     "A00": "Total_Population",
-    "A08": "Sex",
-    "B18": "Race_Short",
-    "B58": "Race_Detailed_and_Age",
-    "C45": "Hispanic_Origin",
-    # Add other codes as needed
+    "A08": "Total_Population_By_Sex",
+    "D08": "Total_Population_By_Sex",
+    "AR9": "Median_Age_Of_Persons",
+    "B58": "Persons_By_Sex_By_Age",
+    "B18": "Persons_By_Race",
+    "AS9": "Persons_In_Housesholds_By_Sex",
+    "A39": "Persons_In_Households_By_Age",
+    "CQ9": "Persons_Under_18_In_Households",
+    "CR1": "Persons_65_Years_And_Over_In_Households",
+    "CR3": "Persons_65_Years_And_Over_In_The_Households_By_Household_Type",
+    "A68": "Total_Families",
+    "CL5": "Persons_In_Families",
+    "AG4": "Families_By_Family_Type_By_Presence_And_Age_Of_Own_Children",
 }
 
-# Step A: Read Header Rows
+# Step A: Read Headers
 df_raw = pd.read_csv(target_csv_name, header=None, low_memory=False)
-header_codes = df_raw.iloc[0] # Row 0 (GISJOIN)
-header_names = df_raw.iloc[1] # Row 1 (Descriptions)
-data_rows = df_raw.iloc[2:]   # The actual data
+header_codes = df_raw.iloc[0] 
+header_names = df_raw.iloc[1] 
+data_rows = df_raw.iloc[2:]   
 
-# Temporarily assign columns for filtering
 data_rows.columns = header_codes
 
 # Step B: Filter for Maryland
-# Tries to find "STATE" column, or falls back to column index 2
 if "STATE" in data_rows.columns:
     md_data = data_rows[data_rows["STATE"] == "Maryland"].copy()
 else:
@@ -202,36 +184,34 @@ else:
 
 print(f"[INFO] Filtered rows for Maryland: {len(md_data)}")
 
-# Step C: Define Base Columns
+# Step C: Base Columns
 base_cols = ["GISJOIN", "YEAR", "STATE", "STATEFP", "STATENH", "NAME"]
 valid_base_cols = [c for c in base_cols if c in md_data.columns]
 
-# Step D: Group Metrics and Save Files
+# Step D: Group & Save
 metric_cols = [c for c in md_data.columns if c not in valid_base_cols]
 
 grouped_metrics = defaultdict(list)
 for col in metric_cols:
-    prefix = col[:3] # Group by Table ID
+    prefix = col[:3]
     grouped_metrics[prefix].append(col)
 
 for prefix, cols in grouped_metrics.items():
-    # 1. Get readable name
     human_name = filename_map.get(prefix, f"Table_{prefix}")
     
-    # 2. Slice data
+    # Slice Data
     selection_cols = valid_base_cols + cols
     subset_data = md_data[selection_cols]
     
-    # 3. Re-attach headers
+    # Headers
     header_df = pd.concat([header_codes.to_frame().T, header_names.to_frame().T])
     header_df.columns = header_codes 
     subset_headers = header_df[selection_cols]
     
-    # 4. Concatenate Headers + Data
     final_output = pd.concat([subset_headers, subset_data], ignore_index=True)
     
-    # 5. Save
-    out_filename = f"Maryland_{human_name}.csv"
+    # SAVE: Added {prefix} to filename to prevent duplicates
+    out_filename = f"Maryland_{human_name}_{prefix}.csv"
     out_path = os.path.join(md_demog_output_folder, out_filename)
     final_output.to_csv(out_path, index=False, header=False) 
     
