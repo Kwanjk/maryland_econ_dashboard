@@ -8,10 +8,11 @@ _University of Maryland, College Park_
 ## Description
 In collaboration with the National Center for Smart Growth Research and Education (NCSG) at the University of Maryland, College Park, this project produces CSV outputs and visualizations of economic indicators for Maryland counties and the state.  
 
-We pull data from three sources:
+We pull data from four sources:
 * **FRED** — population, housing, GDP, and other economic indicators (`fred_api.py`).
 * **BLS** — employment, unemployment rate, unemployment count, and labor force metrics (`bls_api.py`).
 * **Socrata (Maryland Open Data)** — foreclosure filings data by county (`socrata_api.py`).
+* **IPUMS NHGIS** — demographic time series data including population, race, sex, and age breakdowns (`ipums_api.py`).
 
 The scripts handle:
 * Retrieving series metadata (title, source, frequency, observation start/end)
@@ -31,6 +32,9 @@ Running the API scripts creates CSV files organized by source:
     - Merged county files: `bls_csv_outputs/county_data/merged/{county}_all_metrics.csv`
 * **Socrata outputs**
     - Per-county foreclosure metrics pivoted by type (e.g., NOI/NOF/FPR): `maryland_foreclosure_data/{COUNTY}.csv`
+* **IPUMS outputs**
+    - Demographic time series data for Maryland: `ipums_csv_outputs/md_demog/Maryland_{table_name}.csv`
+    - Raw downloaded files: `ipums_csv_outputs/raw_zips/`
 
 ---
 
@@ -43,8 +47,9 @@ pip install -r requirements.txt
 ```yaml
 fred_api: your_api_key_here
 bls_api: your_api_key_here
+ipums_api: your_api_key_here
 ```
-3. Place `Indicators Series ID List.xlsx` in the repository root (same folder as the scripts).
+3. Place `Indicators Series ID List.xlsx` in the repository root (same folder as the scripts). This file is required for `fred_api.py`, `bls_api.py`, `ipums_api.py`, and `generate_plotly_dash.py`.
 4. Fetch FRED data:
 ```bash
 python fred_api.py
@@ -53,11 +58,20 @@ python fred_api.py
 ```bash
 python bls_api.py
 ```
-6. Fetch Socrata foreclosure data (Maryland Open Data):
+6. Fetch Socrata foreclosure data (Maryland Open Data - no API key required):
 ```bash
 python socrata_api.py
 ```
-7. (Optional) Explore dashboards/plots with `generate_plotly_dash.py` once FRED outputs exist. The script expects data in `fred_csv_outputs/state_data` and `fred_csv_outputs/county_data`.
+7. Fetch IPUMS NHGIS demographic data (requires "MD IPUMS NHGIS" sheet in the Excel file):
+```bash
+python ipums_api.py
+```
+8. (Optional) Explore dashboards/plots with `generate_plotly_dash.py` once FRED outputs exist. The script expects data in `fred_csv_outputs/state_data` and `fred_csv_outputs/county_data`.
+9. (Optional) Generate choropleth maps of Maryland counties with `tile_map.py`. **Prerequisites:** Run `bls_api.py` first to generate merged county data. Navigate to `bls_csv_outputs/county_data/merged/` before running this script, as it looks for `*_all_metrics.csv` files in the current directory:
+```bash
+cd bls_csv_outputs/county_data/merged
+python ../../../tile_map.py
+```
 
 ---
 
@@ -90,17 +104,28 @@ maryland_foreclosure_data/
 ├── ALLEGANY.csv
 ├── ANNE_ARUNDEL.csv
 └── ...
+
+ipums_csv_outputs/
+├── md_demog/
+│   ├── Maryland_Total_Population.csv
+│   ├── Maryland_Sex.csv
+│   ├── Maryland_Race_Short.csv
+│   ├── Maryland_Race_Detailed_and_Age.csv
+│   └── ...
+└── raw_zips/
+    └── nhgis####.zip
 ```
 
 Each CSV contains:
 * FRED/BLS: `date` – observation date; `value` – observed value for the series
 * Socrata: `OBSERVATION DATE` plus foreclosure metrics columns (e.g., `NOI`, `NOF`, `FPR`) per county
+* IPUMS: Time series demographic data with GISJOIN, YEAR, STATE, and metric columns (e.g., population counts, race breakdowns)
 
 ## Required Dependencies
 This project requires the following Python libraries:
 * `pandas` – for data manipulation
 * `fredapi` – for accessing the FRED API
-* `requests` – for BLS API calls
+* `requests` – for API calls (BLS, IPUMS, Socrata, and map data)
 * `pyyaml` – for loading API keys securely
 * `openpyxl` – for reading .xlsx files
 * `dash` and `plotly` – for dashboards and visualizations
